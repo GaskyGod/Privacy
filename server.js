@@ -227,11 +227,13 @@ app.post('/paypalWebhook', async (req, res) => {
 
     const evt = req.body || {};
     const type = String(evt.event_type || '').toUpperCase();
-    if (type !== 'PAYMENT.CAPTURE.COMPLETED') {
+    const accepted = new Set(['PAYMENT.CAPTURE.COMPLETED', 'CHECKOUT.ORDER.COMPLETED']);
+    if (!accepted.has(type)) {
       return res.json({ ok: true, ignored: true, eventType: type });
     }
 
     const orderId = String(
+      evt?.resource?.id ||
       evt?.resource?.supplementary_data?.related_ids?.order_id ||
       evt?.resource?.invoice_id ||
       ''
