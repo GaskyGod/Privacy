@@ -89,6 +89,63 @@ function parseOrderApproveUrl(order) {
   return approve?.href || null;
 }
 
+async function capturePaypalOrder(orderId, token) {
+  const captureResp = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'PayPal-Request-Id': `cap_${orderId}`
+    },
+    body: '{}'
+  });
+  const captureJson = await captureResp.json().catch(() => ({}));
+  if (captureResp.ok) return { ok: true, data: captureJson };
+
+  const issue = String(captureJson?.details?.[0]?.issue || '').toUpperCase();
+  if (issue === 'ORDER_ALREADY_CAPTURED') return { ok: true, alreadyCaptured: true, data: captureJson };
+  return { ok: false, data: captureJson, status: captureResp.status };
+}
+
+async function completeRenewalByOrderId(orderId) {
+  const q = await db.collection('licenseRenewals').where('orderId', '==', orderId).limit(1).get();
+  if (q.empty) return { ok: false, code: 404, reason: 'Renewal no encontrada para orderId' };
+  const renewalRef = q.docs[0].ref;
+
+  await db.runTransaction(async (tx) => {
+    const renewalSnap = await tx.get(renewalRef);
+    if (!renewalSnap.exists) throw new Error('RENEWAL_NOT_FOUND');
+    const renewal = renewalSnap.data() || {};
+    if (String(renewal.status || '').toUpperCase() === 'COMPLETED') return;
+
+    const licenseKey = String(renewal.licenseKey || '').trim();
+    const days = Math.max(0, Number(renewal.days || 0));
+    if (!licenseKey || !days) throw new Error('RENEWAL_INVALID');
+
+    const licenseRef = db.collection('licenses').doc(licenseKey);
+    const licenseSnap = await tx.get(licenseRef);
+    if (!licenseSnap.exists) throw new Error('LICENSE_NOT_FOUND');
+    const license = licenseSnap.data() || {};
+
+    const nowMs = Date.now();
+    const baseMs = Math.max(nowMs, getExpiresAtMs(license) || 0);
+    const newExpiresAt = baseMs + (days * 86_400_000);
+
+    tx.update(licenseRef, {
+      expiresAt: admin.firestore.Timestamp.fromMillis(newExpiresAt),
+      lastSeen: admin.firestore.FieldValue.serverTimestamp()
+    });
+    tx.update(renewalRef, {
+      status: 'COMPLETED',
+      paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      daysAdded: days,
+      newExpiresAt
+    });
+  });
+
+  return { ok: true };
+}
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, mode: PAYPAL_MODE });
 });
@@ -227,53 +284,37 @@ app.post('/paypalWebhook', async (req, res) => {
 
     const evt = req.body || {};
     const type = String(evt.event_type || '').toUpperCase();
-    const accepted = new Set(['PAYMENT.CAPTURE.COMPLETED', 'CHECKOUT.ORDER.COMPLETED']);
+    const accepted = new Set(['PAYMENT.CAPTURE.COMPLETED', 'CHECKOUT.ORDER.COMPLETED', 'CHECKOUT.ORDER.APPROVED']);
     if (!accepted.has(type)) {
       return res.json({ ok: true, ignored: true, eventType: type });
     }
 
-    const orderId = String(
+    let orderId = String(
       evt?.resource?.id ||
       evt?.resource?.supplementary_data?.related_ids?.order_id ||
       evt?.resource?.invoice_id ||
       ''
     ).trim();
     if (!orderId) return res.status(400).json({ ok: false, reason: 'No orderId en evento' });
+    console.log('[renewal] webhook event', { type, orderId });
 
-    const q = await db.collection('licenseRenewals').where('orderId', '==', orderId).limit(1).get();
-    if (q.empty) return res.status(404).json({ ok: false, reason: 'Renewal no encontrada para orderId' });
-    const renewalRef = q.docs[0].ref;
+    if (type === 'CHECKOUT.ORDER.APPROVED') {
+      const token = await paypalAccessToken();
+      const captureResult = await capturePaypalOrder(orderId, token);
+      if (!captureResult.ok) {
+        console.error('[renewal] capture error', captureResult.status, captureResult.data);
+        return res.status(502).json({ ok: false, reason: 'No se pudo capturar la orden aprobada' });
+      }
+      const capturedOrderId = String(
+        captureResult?.data?.id ||
+        captureResult?.data?.purchase_units?.[0]?.payments?.captures?.[0]?.supplementary_data?.related_ids?.order_id ||
+        orderId
+      ).trim();
+      orderId = capturedOrderId || orderId;
+    }
 
-    await db.runTransaction(async (tx) => {
-      const renewalSnap = await tx.get(renewalRef);
-      if (!renewalSnap.exists) throw new Error('RENEWAL_NOT_FOUND');
-      const renewal = renewalSnap.data() || {};
-      if (String(renewal.status || '').toUpperCase() === 'COMPLETED') return;
-
-      const licenseKey = String(renewal.licenseKey || '').trim();
-      const days = Math.max(0, Number(renewal.days || 0));
-      if (!licenseKey || !days) throw new Error('RENEWAL_INVALID');
-
-      const licenseRef = db.collection('licenses').doc(licenseKey);
-      const licenseSnap = await tx.get(licenseRef);
-      if (!licenseSnap.exists) throw new Error('LICENSE_NOT_FOUND');
-      const license = licenseSnap.data() || {};
-
-      const nowMs = Date.now();
-      const baseMs = Math.max(nowMs, getExpiresAtMs(license) || 0);
-      const newExpiresAt = baseMs + (days * 86_400_000);
-
-      tx.update(licenseRef, {
-        expiresAt: admin.firestore.Timestamp.fromMillis(newExpiresAt),
-        lastSeen: admin.firestore.FieldValue.serverTimestamp()
-      });
-      tx.update(renewalRef, {
-        status: 'COMPLETED',
-        paidAt: admin.firestore.FieldValue.serverTimestamp(),
-        daysAdded: days,
-        newExpiresAt
-      });
-    });
+    const result = await completeRenewalByOrderId(orderId);
+    if (!result.ok) return res.status(result.code || 500).json({ ok: false, reason: result.reason || 'No se pudo completar renovacion' });
 
     return res.json({ ok: true });
   } catch (e) {
