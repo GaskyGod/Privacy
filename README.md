@@ -73,3 +73,5 @@ Si quieres alojar solo el frontend en tu hosting:
   - `trim`
 - Si ya existe, se suman dias sobre `max(now, expiresAt)`.
 - Si no existe, se crea con `deviceId: null` (se reclama luego desde la app).
+
+Sync deploy marker: 2026-02-20T11:14:43
