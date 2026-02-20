@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tikplays - Comprar Suscripción</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; font-family: "Inter", "Segoe UI", system-ui, sans-serif; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 500px at 5% -10%, #2563eb3d, transparent 60%),
+        radial-gradient(1000px 500px at 110% 110%, #7c3aed33, transparent 60%),
+        #070b16;
+      color: #e5e7eb;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(920px, 100%);
+      background: #101827d9;
+      border: 1px solid #ffffff1a;
+      border-radius: 18px;
+      box-shadow: 0 20px 65px #0008;
+      padding: 22px;
+    }
+    h1 { margin: 0 0 6px; font-size: 30px; }
+    .sub { margin: 0 0 18px; color: #9ca3af; }
+    .grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+    @media (min-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
+    label { display: block; font-size: 13px; margin: 0 0 6px; color: #cbd5e1; }
+    input {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0b1222;
+      color: #f8fafc;
+      padding: 11px 12px;
+      outline: none;
+    }
+    input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px #60a5fa29; }
+    .plans {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 760px) { .plans { grid-template-columns: 1fr 1fr 1fr; } }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px;
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: .2px;
+    }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .p1 { background: linear-gradient(135deg, #059669, #10b981); }
+    .p6 { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+    .p12 { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+    .msg { margin-top: 12px; color: #cbd5e1; font-size: 14px; min-height: 20px; }
+    .ok { color: #34d399; }
+    .err { color: #f87171; }
+    .result {
+      margin-top: 16px;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      background: #0b1324;
+      padding: 14px;
+      display: none;
+    }
+    .result code {
+      display: inline-block;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #93c5fd;
+      border-radius: 8px;
+      padding: 4px 8px;
+      margin-left: 6px;
+    }
+    .download {
+      display: inline-block;
+      margin-top: 10px;
+      text-decoration: none;
+      color: #fff;
+      background: #1d4ed8;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 700;
+    }
+    .foot {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Compra tu suscripción Tikplays</h1>
+    <p class="sub">Tu licencia será tu usuario de TikTok en minúsculas y sin arroba.</p>
+
+    <div class="grid">
+      <div>
+        <label for="username">Usuario TikTok</label>
+        <input id="username" placeholder="@tu_usuario" autocomplete="username" />
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="tu@email.com" autocomplete="email" />
+      </div>
+    </div>
+
+    <div class="plans">
+      <button class="p1" data-plan="1m">1 mes - $14.99</button>
+      <button class="p6" data-plan="6m">6 meses - $59.99</button>
+      <button class="p12" data-plan="12m">1 año - $99.99</button>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <section id="result" class="result">
+      <div>Tu licencia:<code id="licenseKeyView"></code></div>
+      <div id="expiresView" style="margin-top:8px;color:#93c5fd"></div>
+      <a id="downloadBtn" class="download" href="#" target="_blank" rel="noopener">Descargar app</a>
+    </section>
+
+    <p class="foot">Si ya tenías licencia con ese usuario, la compra suma días sobre tu tiempo actual.</p>
+  </main>
+
+  <script>
+    // CAMBIA SOLO ESTO CUANDO QUIERAS APUNTAR A OTRA API
+    const API_BASE = "https://awake-joy-production-8063.up.railway.app";
+
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const msg = $("msg");
+      const result = $("result");
+      const usernameEl = $("username");
+      const emailEl = $("email");
+      const licenseKeyView = $("licenseKeyView");
+      const expiresView = $("expiresView");
+      const downloadBtn = $("downloadBtn");
+      let busy = false;
+
+      function setMsg(text, cls = "") {
+        msg.className = "msg " + cls;
+        msg.textContent = text || "";
+      }
+      function normalizeName(v) {
+        return String(v || "").trim().replace(/^@+/, "").toLowerCase();
+      }
+      function setDisabled(on) {
+        document.querySelectorAll("button[data-plan]").forEach((b) => { b.disabled = !!on; });
+      }
+      async function api(path, init = {}) {
+        const r = await fetch(API_BASE + path, init);
+        const js = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, data: js };
+      }
+      async function waitDone(orderId) {
+        const endAt = Date.now() + (10 * 60 * 1000);
+        while (Date.now() < endAt) {
+          const rs = await api("/purchase/order-status?orderId=" + encodeURIComponent(orderId), { cache: "no-store" });
+          const st = String(rs?.data?.status || "").toUpperCase();
+          if (st === "COMPLETED") return rs.data;
+          if (st === "FAILED" || st === "CANCELED") return rs.data;
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+        }
+        return { ok: false, status: "TIMEOUT" };
+      }
+
+      document.querySelectorAll("button[data-plan]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (busy) return;
+          const planId = btn.getAttribute("data-plan");
+          const username = normalizeName(usernameEl.value);
+          const email = String(emailEl.value || "").trim();
+          if (!username) return setMsg("Ingresa tu usuario de TikTok.", "err");
+          if (!email) return setMsg("Ingresa tu email.", "err");
+
+          busy = true;
+          setDisabled(true);
+          result.style.display = "none";
+          setMsg("Creando orden de pago...");
+
+          try {
+            const create = await api("/purchase/create-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ planId, username, email })
+            });
+            const data = create.data || {};
+            if (!create.ok || !data.ok || !data.orderId || !data.approveUrl) {
+              throw new Error(data.reason || "No se pudo crear la orden");
+            }
+
+            setMsg("Abriendo PayPal. Completa el pago para recibir tu licencia.");
+            window.open(data.approveUrl, "_blank", "noopener");
+
+            const done = await waitDone(data.orderId);
+            const status = String(done.status || "").toUpperCase();
+            if (status === "COMPLETED") {
+              setMsg("Pago confirmado. Licencia lista.", "ok");
+              licenseKeyView.textContent = done.licenseKey || username;
+              expiresView.textContent = done.expiresAtMs ? ("Vence: " + new Date(done.expiresAtMs).toLocaleString()) : "";
+              downloadBtn.href = done.downloadUrl || "#";
+              result.style.display = "block";
+            } else {
+              setMsg("Pago no completado: " + (done.status || "desconocido"), "err");
+            }
+          } catch (e) {
+            setMsg("Error: " + (e && e.message ? e.message : e), "err");
+          } finally {
+            busy = false;
+            setDisabled(false);
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

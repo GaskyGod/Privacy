@@ -40,6 +40,7 @@ const PAYPAL_WEBHOOK_ID = String(process.env.PAYPAL_WEBHOOK_ID || '').trim();
 const RENEWAL_PROXY_KEY = String(process.env.RENEWAL_PROXY_KEY || '').trim();
 const APP_DOWNLOAD_URL = String(process.env.APP_DOWNLOAD_URL || '').trim();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const WEB_BUY_ALLOWED_ORIGINS = String(process.env.WEB_BUY_ALLOWED_ORIGINS || '*').trim();
 
 function normalizeTikTokUsername(input) {
   const raw = String(input || '').trim();
@@ -59,6 +60,40 @@ function sanitizeEmail(input) {
   if (!EMAIL_RE.test(email)) return { ok: false, reason: 'email invalido' };
   return { ok: true, value: email };
 }
+
+function isOriginAllowed(origin) {
+  if (!origin) return false;
+  if (WEB_BUY_ALLOWED_ORIGINS === '*') return true;
+  const allowed = WEB_BUY_ALLOWED_ORIGINS
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  return allowed.includes(origin);
+}
+
+function applyCors(req, res) {
+  const origin = String(req.headers?.origin || '').trim();
+  if (WEB_BUY_ALLOWED_ORIGINS === '*') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,x-renewal-key');
+}
+
+app.use((req, res, next) => {
+  if (
+    req.path === '/purchase/create-order' ||
+    req.path === '/purchase/order-status' ||
+    req.path === '/health'
+  ) {
+    applyCors(req, res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
+  }
+  next();
+});
 
 function planAmount(planId) {
   const priceEnvKey = PLAN_ENV[planId];

@@ -35,6 +35,7 @@ Comunes:
 - `RENEWAL_PROXY_KEY` (debe coincidir con `RENEWAL_API_KEY` en la app local)
 - `FIREBASE_SERVICE_ACCOUNT_JSON` (JSON completo de service account; tambien acepta base64)
 - `APP_DOWNLOAD_URL` (link publico del instalador para mostrar tras compra web)
+- `WEB_BUY_ALLOWED_ORIGINS` (opcional; dominios permitidos para frontend externo, separado por comas. Ej: `https://tikplays.live,https://www.tikplays.live`. Usa `*` para permitir todos)
 
 ## Configuracion en app local
 
@@ -54,6 +55,15 @@ Eventos recomendados:
 - `CHECKOUT.ORDER.APPROVED`
 - `CHECKOUT.ORDER.COMPLETED`
 - `PAYMENT.CAPTURE.COMPLETED`
+
+## Frontend en hosting externo (sin mover backend)
+
+Si quieres alojar solo el frontend en tu hosting:
+
+1. Sube el archivo `buy-frontend.html` a tu hosting (por ejemplo `https://tu-dominio.com/comprar.html`).
+2. En ese archivo, ajusta `API_BASE` con tu dominio Railway.
+3. En Railway, configura `WEB_BUY_ALLOWED_ORIGINS` con tu dominio de hosting.
+4. Mantén el webhook de PayPal apuntando a Railway.
 
 ## Notas del flujo de compra web
 
