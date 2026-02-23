@@ -1,0 +1,499 @@
+﻿<!DOCTYPE html>
+
+<html lang="es" class="scroll-smooth">
+
+<head>
+
+  <meta charset="utf-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Tikplays - Comprar App para TikTok Live</title>
+
+  <meta name="description" content="Compra la App Tikplays para TikTok Live o obtenla gratis uniendote a la agencia. Elige tu camino y empieza hoy." />
+
+  <meta name="color-scheme" content="dark light" />
+
+  <meta name="theme-color" content="#0ea5e9" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+
+    tailwind.config = {
+
+      theme: {
+
+        extend: {
+
+          fontFamily: { sans: ['Inter','system-ui'] },
+
+          colors: {
+
+            brand: { 600:'#2563eb', 700:'#1d4ed8' },
+
+            accent: { 500:'#22d3ee', 600:'#06b6d4' }
+
+          },
+
+          boxShadow: { glow: '0 10px 40px rgba(37,99,235,.35)' }
+
+        }
+
+      }
+
+    }
+
+  </script>
+
+  <style>
+
+    .reveal{opacity:0; transform:translateY(18px); transition:opacity .6s ease, transform .6s ease}
+
+    .reveal.show{opacity:1; transform:translateY(0)}
+
+    /* --- Animaciones & efectos --- */
+
+    @keyframes float {0%{transform:translateY(0)}50%{transform:translateY(-8px)}100%{transform:translateY(0)}}
+
+    @keyframes glow {0%{box-shadow:0 0 0 rgba(59,130,246,0)}50%{box-shadow:0 0 40px rgba(59,130,246,.35)}100%{box-shadow:0 0 0 rgba(59,130,246,0)}}
+
+    @keyframes shimmer {0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+    .gradient-text{background:linear-gradient(90deg,#60a5fa,#22d3ee,#60a5fa);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 6s linear infinite}
+
+    .orb{filter:blur(32px);opacity:.35;animation:float 8s ease-in-out infinite}
+
+    .tilt{transform-style:preserve-3d;transition:transform .25s ease}
+
+    .tilt:hover{transform:perspective(900px) rotateX(6deg) rotateY(-6deg)}
+
+    .badge-pulse{animation:glow 3.6s ease-in-out infinite}
+
+    .marquee{display:flex;gap:2.5rem;white-space:nowrap;animation:mar 30s linear infinite}
+
+    @keyframes mar{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+  </style>
+
+</head>
+
+<body class="bg-slate-950 text-white font-sans">
+
+  <!-- Navbar -->
+
+  <header class="sticky top-0 z-40 bg-slate-950/70 border-b border-white/10">
+
+    <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
+
+      <a href="#" class="flex items-center gap-3">
+
+        <img src="img/tikplays.png" alt="Tikplays" class="h-10 w-auto" />
+
+        <span class="hidden sm:inline text-white font-semibold">TikPlays</span>
+
+      </a>
+
+      <nav class="hidden md:flex gap-8 text-white/80">
+
+        <a href="#juegos" class="hover:text-white">Juegos</a>
+
+        <a href="#beneficios" class="hover:text-white">Beneficios</a>
+
+        <a href="#app" class="hover:text-white">App</a>
+
+        <a href="#faq" class="hover:text-white">FAQ</a>
+
+      </nav>
+
+    </div>
+
+  </header>  <!-- Hero -->
+  <section class="relative overflow-hidden pt-10 sm:pt-14 pb-16 text-center bg-slate-900/30">
+    <div class="pointer-events-none absolute inset-0 -z-10">
+      <div class="orb absolute -top-10 -left-10 w-56 h-56 rounded-full bg-brand-600/40"></div>
+      <div class="orb absolute bottom-0 right-0 w-72 h-72 rounded-full bg-accent-600/30" style="animation-delay:.8s"></div>
+    </div>
+    <img src="img/tikplays.png" alt="Logo Tikplays" class="mx-auto" />
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/70 badge-pulse">#TikTokLive #Gaming #Interactive</div>
+    <h1 class="mt-4 text-4xl sm:text-5xl font-extrabold leading-tight">Consigue la <span class="gradient-text">App Tikplays</span> para tus directos</h1>
+    <p class="mt-3 text-white/70 max-w-2xl mx-auto">Activa juegos interactivos en TikTok Live en minutos. Puedes <strong>comprar la app ahora</strong> o conseguirla <strong>gratis</strong> uniendote a la agencia.</p>
+    <div class="mt-7 flex flex-wrap justify-center gap-4">
+      <a href="https://tikplays.live/buy.html" class="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-extrabold px-6 py-3 rounded-xl shadow-[0_10px_40px_rgba(16,185,129,.35)]">Comprar App ($14.99/mes)</a>
+      <a href="https://discord.gg/tZC5W7mrwh" target="_blank" class="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-xl font-semibold">Unirme gratis a la agencia</a>
+    </div>
+    <div class="mt-10 overflow-hidden border-y border-white/10 py-3">
+      <div class="marquee text-white/40 text-sm">
+        <span>Compra directa disponible ·</span><span>Integracion OBS ·</span><span>Roblox ·</span><span>Minecraft ·</span><span>GTA V ·</span><span>Soporte 1:1 ·</span><span>Tambien gratis en agencia ·</span>
+        <span>Compra directa disponible ·</span><span>Integracion OBS ·</span><span>Roblox ·</span><span>Minecraft ·</span><span>GTA V ·</span><span>Soporte 1:1 ·</span><span>Tambien gratis en agencia ·</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Elige tu camino -->
+  <section id="camino" class="py-14">
+    <div class="max-w-6xl mx-auto px-4">
+      <h2 class="text-3xl sm:text-4xl font-extrabold text-center">Elige tu camino</h2>
+      <p class="text-center text-white/65 mt-3">Ambas opciones te llevan a Tikplays. Si quieres empezar hoy, compra directa.</p>
+      <div class="mt-10 grid md:grid-cols-2 gap-6">
+        <div class="reveal rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/10 to-transparent p-6">
+          <div class="inline-flex items-center rounded-full bg-emerald-500 text-emerald-950 px-3 py-1 text-xs font-black">Recomendado</div>
+          <h3 class="mt-4 text-2xl font-extrabold">Comprar la aplicacion</h3>
+          <p class="mt-2 text-white/75">Activa tu licencia al instante por <strong>$14.99/mes</strong> y empieza a usar Tikplays hoy mismo.</p>
+          <ul class="mt-4 text-sm text-white/80 space-y-2">
+            <li>• Activacion inmediata</li>
+            <li>• Acceso completo a la app</li>
+            <li>• Renovacion dentro de la app</li>
+          </ul>
+          <a href="https://tikplays.live/buy.html" class="mt-6 inline-block w-full text-center rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-extrabold px-6 py-3">Comprar ahora</a>
+        </div>
+        <div class="reveal rounded-2xl border border-white/15 bg-white/5 p-6">
+          <div class="inline-flex items-center rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-200 px-3 py-1 text-xs font-semibold">Alternativa</div>
+          <h3 class="mt-4 text-2xl font-extrabold">Unirte a la agencia</h3>
+          <p class="mt-2 text-white/75">Tambien puedes obtener la app gratis al entrar en TikPlays Agency.</p>
+          <ul class="mt-4 text-sm text-white/80 space-y-2">
+            <li>• Ingreso 100% gratis</li>
+            <li>• Beneficios para creadores</li>
+            <li>• Juegos con descuento o gratis</li>
+          </ul>
+          <a href="https://discord.gg/tZC5W7mrwh" target="_blank" class="mt-6 inline-block w-full text-center rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold px-6 py-3 border border-white/10">Unirme a la agencia</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Beneficios -->
+
+  <section id="beneficios" class="py-20">
+
+    <div class="max-w-6xl mx-auto px-4">
+
+      <h2 class="text-3xl font-extrabold text-center">Beneficios al unirte</h2>
+
+      <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <div class="reveal bg-white/5 p-6 rounded-2xl border border-white/10">
+
+          <h3 class="font-semibold text-lg">Ingreso 100% gratis</h3>
+
+          <p class="mt-2 text-white/70 text-sm">TikTok nos paga directamente, tú nunca pagas por estar en la agencia.</p>
+
+        </div>
+
+        <div class="reveal bg-white/5 p-6 rounded-2xl border border-white/10">
+
+          <h3 class="font-semibold text-lg">Juegos gratis o con descuento</h3>
+
+          <p class="mt-2 text-white/70 text-sm">Acceso exclusivo a títulos interactivos para tu live sin costo o con rebajas especiales.</p>
+
+        </div>
+
+        <div class="reveal bg-white/5 p-6 rounded-2xl border border-white/10">
+
+          <h3 class="font-semibold text-lg">App Tikplays incluida</h3>
+
+          <p class="mt-2 text-white/70 text-sm">Conecta tu live con el chat, likes y regalos de TikTok y hazlos parte del juego.</p>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <!-- Juegos -->
+
+  
+
+<!-- ================== PLANES (SUSCRIPCION) ================== -->
+<section id="planes" class="py-20">
+  <div class="max-w-6xl mx-auto px-4">
+    <div class="text-center">
+      <h2 class="text-4xl font-extrabold">Compra tu <span class="text-emerald-400">licencia Tikplays</span></h2>
+      <p class="mt-4 text-white/70 max-w-2xl mx-auto">Elige un plan y completa el pago en la pagina oficial. Tu licencia sera tu usuario de TikTok en minusculas y sin @.</p>
+      <a href="https://tikplays.live/buy.html" class="mt-6 inline-block bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-extrabold px-7 py-3 rounded-xl shadow-[0_10px_40px_rgba(16,185,129,.35)]">Ir a comprar ahora</a>
+    </div>
+
+    <div class="mt-10 grid md:grid-cols-3 gap-6">
+      <div class="rounded-2xl border border-emerald-500/40 bg-white/5 p-6 ring-1 ring-emerald-500/30">
+        <div class="text-white/60 text-sm">MENSUAL</div>
+        <div class="mt-1 text-3xl font-extrabold">$14.99<span class="text-base text-white/60">/mes</span></div>
+        <p class="mt-2 text-sm text-white/70">Acceso completo mensual.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div class="text-white/60 text-sm">PREMIUM PLUS</div>
+        <div class="mt-1 text-3xl font-extrabold">$59.99<span class="text-base text-white/60">/6 meses</span></div>
+        <p class="mt-2 text-sm text-white/70">Ahorra vs. pagar mes a mes.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div class="text-white/60 text-sm">PREMIUM</div>
+        <div class="mt-1 text-3xl font-extrabold">$99.99<span class="text-base text-white/60">/12 meses</span></div>
+        <p class="mt-2 text-sm text-white/70">Ahorro fuerte anual.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="juegos" class="py-20 bg-slate-900/30 border-t border-white/10">
+
+    <div class="max-w-6xl mx-auto px-4">
+
+      <h2 class="text-3xl font-extrabold text-center">Nuestros juegos</h2>
+
+      <div id="gamesGrid" class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"></div>
+
+
+
+    </div>
+
+  </section>
+
+
+
+  <!-- Testimonios con slider -->
+
+  <section id="testimonios" class="py-20">
+
+    <div class="max-w-6xl mx-auto px-4">
+
+      <h2 class="text-3xl font-extrabold text-center">Lo que dicen los creadores</h2>
+
+      <div class="mt-8 relative">
+
+        <div id="slider" class="overflow-hidden rounded-2xl border border-white/10">
+
+          <div id="slides" class="flex transition-transform duration-500">
+
+            <figure class="min-w-full bg-white/5 p-8">
+
+              <blockquote class="text-white/80 text-lg">🎮 Con Tikplays el chat participa sin parar. +35% de watchtime. 🎮</blockquote>
+
+              <figcaption class="mt-4 text-white/60 text-sm">@Sofi_booh2 😎 Streaming diario</figcaption>
+
+            </figure>
+
+            <figure class="min-w-full bg-white/5 p-8">
+
+              <blockquote class="text-white/80 text-lg">😏 Entré gratis a la agencia y ya tengo más de 15 juegos sin costo. 💰</blockquote>
+
+              <figcaption class="mt-4 text-white/60 text-sm">@MartinGaming 🎮 Gamer</figcaption>
+
+            </figure>
+
+            <figure class="min-w-full bg-white/5 p-8">
+
+              <blockquote class="text-white/80 text-lg">😍 La integración con Roblox y OBS fue super fácil!</blockquote>
+
+              <figcaption class="mt-4 text-white/60 text-sm">@KaroPlay 🎮 Roblox</figcaption>
+
+            </figure>
+
+          </div>
+
+        </div>
+
+        <div class="mt-4 flex justify-center gap-2">
+
+          <button class="dot h-2 w-2 rounded-full bg-white/30" aria-label="1"></button>
+
+          <button class="dot h-2 w-2 rounded-full bg-white/30" aria-label="2"></button>
+
+          <button class="dot h-2 w-2 rounded-full bg-white/30" aria-label="3"></button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <!-- App -->
+
+  <section id="app" class="py-20">
+
+    <div class="max-w-5xl mx-auto px-4 text-center">
+
+      <h2 class="text-3xl font-extrabold">App Tikplays</h2>
+
+      <p class="mt-4 text-white/70">Todos los miembros de TikPlays reciben acceso gratis a la App Tikplays. Conecta tus juegos y lives de TikTok en segundos.</p>
+
+      <img src="img/app-dashboard.png" alt="App Tikplays" class="mt-6 mx-auto rounded-xl border border-white/10" />
+
+    </div>
+
+  </section>
+
+
+
+  <!-- FAQ -->
+
+  <section id="faq" class="py-20 bg-slate-900/30 border-t border-white/10">
+
+    <div class="max-w-5xl mx-auto px-4">
+
+      <h2 class="text-3xl font-extrabold text-center">Preguntas frecuentes</h2>
+
+      <div class="mt-8 divide-y divide-white/10 rounded-2xl border border-white/10 bg-white/5">
+
+        <details class="p-6" open>
+
+          <summary class="font-semibold cursor-pointer">1️⃣ ¿Tiene costo entrar a TikPlays?</summary>
+
+          <p class="mt-2 text-white/70">No, es totalmente gratis. TikTok paga a la agencia por tu actividad en los lives.</p>
+
+        </details>
+
+        <details class="p-6">
+
+          <summary class="font-semibold cursor-pointer">2️⃣ ¿Cómo consigo los juegos gratis?</summary>
+
+          <p class="mt-2 text-white/70">Al ser parte de la agencia, tendráss juegos con descuento especial e incluso algunos gratis.</p>
+
+        </details>
+
+        <details class="p-6">
+
+          <summary class="font-semibold cursor-pointer">3️⃣ ¿La App Tikplays tiene costo?</summary>
+
+          <p class="mt-2 text-white/70">No, la App Tikplays es gratis para todos los miembros de TikPlays.</p>
+
+        </details>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <!-- Footer -->
+
+  <footer class="py-10 border-t border-white/10">
+
+    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row justify-between text-sm text-white/60">
+
+      <p>© 2025 TikPlays • <a href="https://tikplays.live" class="hover:text-white">tikplays.live</a></p>
+
+      <div class="flex gap-4 mt-4 sm:mt-0">
+
+        <a href="#" class="hover:text-white">Privacidad</a>
+
+        <a href="#" class="hover:text-white">Términos</a>
+
+      </div>
+
+    </div>
+
+  </footer>
+
+
+
+  <!-- Scripts -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((e, i) => {
+          if (e.isIntersecting) {
+            e.target.style.transitionDelay = (i * 40) + 'ms';
+            e.target.classList.add('show');
+          }
+        });
+      }, { threshold: .12 });
+      document.querySelectorAll('.reveal,.tilt').forEach(el => observer.observe(el));
+
+      const slides = document.getElementById('slides');
+      const dots = Array.from(document.querySelectorAll('.dot'));
+      let idx = 0;
+      function go(i) {
+        if (!slides) return;
+        idx = (i + 3) % 3;
+        slides.style.transform = `translateX(-${idx * 100}%)`;
+        dots.forEach((d, j) => d.style.background = j === idx ? 'white' : 'rgba(255,255,255,.3)');
+      }
+      dots.forEach((d, i) => d.addEventListener('click', () => go(i)));
+      setInterval(() => go(idx + 1), 5000);
+    });
+  </script>
+
+<script>
+
+  // Edita aquÃ­ tus juegos (imagen y tÃ­tulo)
+
+  const GAMES = [
+
+    { title: "TikFight",       img: "img/game1.png" },
+
+    { title: "Cubo TNT Minecraft",    img: "img/game2.avif" },
+
+    { title: "SandBox Minecraft",img: "img/game3.avif" },
+
+    { title: "Plants Vs Zombies",img: "img/game4.avif" },
+
+    { title: "GTA V KOTH / Survival",img: "img/game5.avif" },
+
+    { title: "R.E.P.P.O",img: "img/game6.avif" },
+
+    { title: "Super Market Simulator",img: "img/game7.avif" },
+
+    { title: "Roblox Stairs",img: "img/juego3.png" },
+
+
+
+    { title: "PVZ Bolos",        img: "img/juego4.png" },
+
+    // { title: "Otro juego", img: "/img/otro.jpg" },
+
+  ];
+
+
+
+  const card = g => `
+
+    <div class="rounded-xl overflow-hidden bg-white/5 backdrop-blur border border-white/10
+
+                hover:-translate-y-1.5 hover:shadow-2xl transition-all duration-300" style="opacity:1;">
+
+      <div class="relative">
+
+        <img src="${g.img}" alt="${g.title}" class="w-full h-[120px] object-cover">
+
+        <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+
+      </div>
+
+      <div class="p-4">
+
+        <h3 class="text-base font-semibold text-white tracking-wide">${g.title}</h3>
+
+      </div>
+
+    </div>`;
+
+
+
+  document.getElementById('gamesGrid').innerHTML = GAMES.map(card).join('');
+
+</script>
+
+
+
+
+
+</body>
+
+</html>
+
+

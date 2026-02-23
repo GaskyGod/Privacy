@@ -87,6 +87,7 @@ app.use((req, res, next) => {
   if (
     req.path === '/purchase/create-order' ||
     req.path === '/purchase/order-status' ||
+    req.path === '/purchase/recover-license' ||
     req.path === '/health'
   ) {
     applyCors(req, res);
@@ -599,6 +600,42 @@ app.get('/purchase/order-status', async (req, res) => {
   } catch (e) {
     console.error('[purchase] status error', e);
     return res.status(500).json({ ok: false, reason: 'Error consultando estado de compra' });
+  }
+});
+
+app.post('/purchase/recover-license', async (req, res) => {
+  const usernameRaw = String(req.body?.username || '').trim();
+  const normalized = normalizeTikTokUsername(usernameRaw);
+  if (!normalized.ok) return res.status(400).json({ ok: false, reason: normalized.reason });
+
+  const licenseKey = normalized.value;
+  try {
+    const licenseRef = db.collection('licenses').doc(licenseKey);
+    const licenseSnap = await licenseRef.get();
+    if (!licenseSnap.exists) {
+      return res.status(404).json({
+        ok: false,
+        reason: 'No encontramos una licencia para ese usuario. Si acabas de pagar, intenta de nuevo en 30-60 segundos o contacta soporte.'
+      });
+    }
+
+    const data = licenseSnap.data() || {};
+    if (data.active !== true) {
+      return res.status(404).json({
+        ok: false,
+        reason: 'La licencia existe pero esta inactiva. Contacta soporte en Discord para ayudarte.'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      licenseKey,
+      downloadUrl: String(APP_DOWNLOAD_URL || '').trim() || null,
+      expiresAtMs: getExpiresAtMs(data) || null
+    });
+  } catch (e) {
+    console.error('[purchase] recover-license error', e);
+    return res.status(500).json({ ok: false, reason: 'Error verificando licencia' });
   }
 });
 

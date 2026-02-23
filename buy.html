@@ -1,0 +1,511 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tikplays - Comprar SuscripciÃ³n</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; font-family: "Inter", "Segoe UI", system-ui, sans-serif; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 500px at 5% -10%, #2563eb3d, transparent 60%),
+        radial-gradient(1000px 500px at 110% 110%, #7c3aed33, transparent 60%),
+        #070b16;
+      color: #e5e7eb;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(920px, 100%);
+      background: #101827d9;
+      border: 1px solid #ffffff1a;
+      border-radius: 18px;
+      box-shadow: 0 20px 65px #0008;
+      padding: 22px;
+    }
+    h1 { margin: 0 0 6px; font-size: 30px; }
+    .sub { margin: 0 0 18px; color: #9ca3af; }
+    .grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+    @media (min-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
+    label { display: block; font-size: 13px; margin: 0 0 6px; color: #cbd5e1; }
+    input {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0b1222;
+      color: #f8fafc;
+      padding: 11px 12px;
+      outline: none;
+    }
+    input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px #60a5fa29; }
+    .plans {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 760px) { .plans { grid-template-columns: 1fr 1fr 1fr; } }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px;
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: .2px;
+    }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .p1 { background: linear-gradient(135deg, #059669, #10b981); }
+    .p6 { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+    .p12 { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+    .msg { margin-top: 12px; color: #cbd5e1; font-size: 14px; min-height: 20px; }
+    .ok { color: #34d399; }
+    .err { color: #f87171; }
+    .result {
+      margin-top: 16px;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      background: #0b1324;
+      padding: 14px;
+      display: none;
+    }
+    .result code {
+      display: inline-block;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #93c5fd;
+      border-radius: 8px;
+      padding: 4px 8px;
+      margin-left: 6px;
+    }
+    .download {
+      display: inline-block;
+      margin-top: 10px;
+      text-decoration: none;
+      color: #fff;
+      background: #1d4ed8;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 700;
+    }
+    .foot {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .support-box {
+      margin-top: 14px;
+      border: 1px solid #60a5fa55;
+      background: linear-gradient(180deg, #0f172acc, #111827cc);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .support-head {
+      font-size: 14px;
+      font-weight: 800;
+      color: #dbeafe;
+      margin: 0 0 8px;
+    }
+    .support-copy {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: #bfdbfe;
+      line-height: 1.45;
+    }
+    .support-actions {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 760px) { .support-actions { grid-template-columns: 1fr auto; } }
+    .discord-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border: 1px solid #7c3aed99;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 700;
+      color: #f5f3ff;
+      background: linear-gradient(135deg, #4c1d95, #6d28d9);
+      white-space: nowrap;
+    }
+    .recover-row {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr auto;
+    }
+    .recover-btn {
+      background: linear-gradient(135deg, #0f766e, #0d9488);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 800;
+    }
+    .paypal-warning {
+      margin-top: 14px;
+      border: 1px solid #f59e0b66;
+      background: linear-gradient(90deg, #92400e33, #78350f22);
+      color: #fde68a;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .completion-banner {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(96vw, 860px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-radius: 12px;
+      border: 1px solid #10b98166;
+      background: linear-gradient(90deg, #065f46f0, #047857f0);
+      color: #ecfdf5;
+      padding: 12px 14px;
+      box-shadow: 0 18px 40px #0008;
+      animation: pulseDone 1.6s ease-in-out infinite;
+    }
+    .completion-banner b { font-size: 14px; }
+    .completion-banner button {
+      border: 1px solid #ffffff50;
+      background: #ffffff20;
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+    @keyframes pulseDone {
+      0%, 100% { filter: saturate(1); }
+      50% { filter: saturate(1.28); }
+    }
+  </style>
+</head>
+<body>
+  <div id="completionBanner" class="completion-banner">
+    <b>Pago confirmado. Ya tienes licencia y boton de descarga en esta pagina.</b>
+    <button id="jumpToResultBtn" type="button">Ver ahora</button>
+  </div>
+
+  <main class="card">
+    <h1>Compra tu suscripciÃ³n Tikplays</h1>
+    <p class="sub">Tu licencia serÃ¡ tu usuario de TikTok en minÃºsculas y sin arroba.</p>
+
+    <div class="grid">
+      <div>
+        <label for="username">Usuario TikTok</label>
+        <input id="username" placeholder="@tu_usuario" autocomplete="username" />
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="tu@email.com" autocomplete="email" />
+      </div>
+    </div>
+
+    <div class="plans">
+      <button class="p1" data-plan="1m">1 mes - $14.99</button>
+      <button class="p6" data-plan="6m">6 meses - $59.99</button>
+      <button class="p12" data-plan="12m">1 aÃ±o - $99.99</button>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <section id="result" class="result">
+      <div>Tu licencia:<code id="licenseKeyView"></code></div>
+      <div id="expiresView" style="margin-top:8px;color:#93c5fd"></div>
+      <a id="downloadBtn" class="download" href="#" target="_blank" rel="noopener">Descargar app</a>
+    </section>
+
+    <div class="paypal-warning">
+      <strong>Aviso importante:</strong> si PayPal te muestra un error al final, vuelve a esta pestaÃ±a.
+      Muchas veces el pago sÃ­ se confirma y aquÃ­ mismo te aparecerÃ¡n tu licencia y el botÃ³n de descarga.
+    </div>
+    <section class="support-box">
+      <p class="support-head">¿Pagaste y no ves tu licencia?</p>
+      <p class="support-copy">Puedes verificar tu usuario para recuperar la licencia y descarga. Si no aparece, te ayudamos por Discord.</p>
+      <div class="support-actions">
+        <div class="recover-row">
+          <input id="recoverUsername" placeholder="Tu usuario TikTok (sin @)" />
+          <button id="recoverBtn" class="recover-btn" type="button">Recuperar</button>
+        </div>
+        <a class="discord-btn" href="https://discord.gg/tZC5W7mrwh" target="_blank" rel="noopener">Contactar en Discord</a>
+      </div>
+    </section>
+
+    <p class="foot">Si ya tenias licencia con ese usuario, la compra suma dias sobre tu tiempo actual.</p>
+  </main>
+
+  <script>
+    // CAMBIA SOLO ESTO CUANDO QUIERAS APUNTAR A OTRA API
+    const API_BASE = "https://awake-joy-production-8063.up.railway.app";
+
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const msg = $("msg");
+      const result = $("result");
+      const usernameEl = $("username");
+      const emailEl = $("email");
+      const licenseKeyView = $("licenseKeyView");
+      const expiresView = $("expiresView");
+      const downloadBtn = $("downloadBtn");
+      const recoverUsername = $("recoverUsername");
+      const recoverBtn = $("recoverBtn");
+      const completionBanner = $("completionBanner");
+      const jumpToResultBtn = $("jumpToResultBtn");
+      let busy = false;
+      const baseTitle = document.title;
+      let titleFlashTimer = null;
+      let audioCtx = null;
+      const PENDING_KEY = "tikplays_pending_order_v1";
+
+      function startTitleFlash() {
+        if (titleFlashTimer) return;
+        let tick = false;
+        titleFlashTimer = setInterval(() => {
+          document.title = tick ? "âœ… Pago listo: vuelve a Tikplays" : "â¬…ï¸ Tikplays te espera";
+          tick = !tick;
+        }, 1000);
+      }
+      function stopTitleFlash() {
+        if (!titleFlashTimer) return;
+        clearInterval(titleFlashTimer);
+        titleFlashTimer = null;
+        document.title = baseTitle;
+      }
+      function showCompletionBanner() {
+        if (!completionBanner) return;
+        completionBanner.style.display = "flex";
+      }
+      function notifyCompletion() {
+        if ("Notification" in window && Notification.permission === "granted") {
+          try {
+            new Notification("Tikplays: compra confirmada", {
+              body: "Tu licencia y enlace de descarga ya estan listos en la pagina de compra."
+            });
+          } catch (_) {}
+        }
+      }
+      function playConfirmTone(isBackground) {
+        try {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return;
+          if (!audioCtx) audioCtx = new Ctx();
+          const now = audioCtx.currentTime;
+          const dur = isBackground ? 0.24 : 0.16;
+          const freqs = isBackground ? [880, 1175, 1568] : [988, 1318];
+
+          freqs.forEach((f, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(f, now + i * (dur + 0.02));
+            gain.gain.setValueAtTime(0.0001, now + i * (dur + 0.02));
+            gain.gain.exponentialRampToValueAtTime(isBackground ? 0.07 : 0.05, now + i * (dur + 0.02) + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + i * (dur + 0.02) + dur);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(now + i * (dur + 0.02));
+            osc.stop(now + i * (dur + 0.02) + dur + 0.01);
+          });
+        } catch (_) {}
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) stopTitleFlash();
+      });
+      jumpToResultBtn?.addEventListener("click", () => {
+        result?.scrollIntoView({ behavior: "smooth", block: "center" });
+        stopTitleFlash();
+      });
+
+      function setMsg(text, cls = "") {
+        msg.className = "msg " + cls;
+        msg.textContent = text || "";
+      }
+      function normalizeName(v) {
+        return String(v || "").trim().replace(/^@+/, "").toLowerCase();
+      }
+      function savePendingOrder(payload) {
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify(payload)); } catch (_) {}
+      }
+      function loadPendingOrder() {
+        try {
+          const raw = localStorage.getItem(PENDING_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!parsed || !parsed.orderId) return null;
+          return parsed;
+        } catch (_) {
+          return null;
+        }
+      }
+      function clearPendingOrder() {
+        try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
+      }
+      function renderLicense(done, fallbackUsername) {
+        const normalized = normalizeName((done && done.licenseKey) || fallbackUsername || "");
+        if (!normalized) return false;
+        licenseKeyView.textContent = normalized;
+        expiresView.textContent = done && done.expiresAtMs ? ("Vence: " + new Date(done.expiresAtMs).toLocaleString()) : "";
+        downloadBtn.href = (done && done.downloadUrl) || "#";
+        result.style.display = "block";
+        showCompletionBanner();
+        notifyCompletion();
+        const bg = !!document.hidden;
+        playConfirmTone(bg);
+        if (bg) startTitleFlash();
+        return true;
+      }
+      function setDisabled(on) {
+        document.querySelectorAll("button[data-plan]").forEach((b) => { b.disabled = !!on; });
+      }
+      async function api(path, init = {}) {
+        const r = await fetch(API_BASE + path, init);
+        const js = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, data: js };
+      }
+      async function waitDone(orderId) {
+        const endAt = Date.now() + (10 * 60 * 1000);
+        while (Date.now() < endAt) {
+          const rs = await api("/purchase/order-status?orderId=" + encodeURIComponent(orderId), { cache: "no-store" });
+          const st = String(rs?.data?.status || "").toUpperCase();
+          if (st === "COMPLETED") return rs.data;
+          if (st === "FAILED" || st === "CANCELED") return rs.data;
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+        }
+        return { ok: false, status: "TIMEOUT" };
+      }
+      async function recoverByUsername(username, silent) {
+        const normalized = normalizeName(username);
+        if (!normalized) {
+          if (!silent) setMsg("Ingresa tu usuario para recuperar licencia.", "err");
+          return false;
+        }
+        const resp = await api("/purchase/recover-license", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: normalized })
+        });
+        if (!resp.ok || !resp.data || !resp.data.ok) {
+          if (!silent) setMsg((resp.data && resp.data.reason) || "No encontramos licencia para ese usuario.", "err");
+          return false;
+        }
+        renderLicense(resp.data, normalized);
+        setMsg("Licencia recuperada correctamente.", "ok");
+        clearPendingOrder();
+        return true;
+      }
+
+      recoverBtn?.addEventListener("click", async () => {
+        const candidate = normalizeName(recoverUsername?.value || usernameEl.value);
+        if (candidate) {
+          recoverUsername.value = candidate;
+          usernameEl.value = candidate;
+        }
+        try {
+          recoverBtn.disabled = true;
+          await recoverByUsername(candidate, false);
+        } finally {
+          recoverBtn.disabled = false;
+        }
+      });
+
+      (async () => {
+        const pending = loadPendingOrder();
+        if (!pending || !pending.orderId) return;
+        const ageMs = Date.now() - Number(pending.createdAt || 0);
+        if (!Number.isFinite(ageMs) || ageMs > 72 * 60 * 60 * 1000) {
+          clearPendingOrder();
+          return;
+        }
+        if (pending.username) {
+          usernameEl.value = pending.username;
+          if (recoverUsername) recoverUsername.value = pending.username;
+        }
+        setMsg("Detectamos una compra pendiente. Verificando estado...");
+        const rs = await api("/purchase/order-status?orderId=" + encodeURIComponent(pending.orderId), { cache: "no-store" });
+        const st = String(rs?.data?.status || "").toUpperCase();
+        if (st === "COMPLETED") {
+          renderLicense(rs.data, pending.username);
+          setMsg("Pago confirmado. Licencia lista.", "ok");
+          clearPendingOrder();
+          return;
+        }
+        if (st === "FAILED" || st === "CANCELED") {
+          setMsg("La orden anterior no se completo. Si ya pagaste, usa Recuperar.", "err");
+          return;
+        }
+        await recoverByUsername(pending.username, true);
+      })();
+
+      document.querySelectorAll("button[data-plan]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (busy) return;
+          const planId = btn.getAttribute("data-plan");
+          const username = normalizeName(usernameEl.value);
+          const email = String(emailEl.value || "").trim();
+          if (!username) return setMsg("Ingresa tu usuario de TikTok.", "err");
+          if (!email) return setMsg("Ingresa tu email.", "err");
+
+          busy = true;
+          setDisabled(true);
+          result.style.display = "none";
+          completionBanner.style.display = "none";
+          stopTitleFlash();
+          setMsg("Creando orden de pago...");
+          if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission().catch(() => {});
+          }
+
+          try {
+            const create = await api("/purchase/create-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ planId, username, email })
+            });
+            const data = create.data || {};
+            if (!create.ok || !data.ok || !data.orderId || !data.approveUrl) {
+              throw new Error(data.reason || "No se pudo crear la orden");
+            }
+
+            setMsg("Abriendo PayPal. Completa el pago para recibir tu licencia.");
+            savePendingOrder({
+              orderId: data.orderId,
+              username,
+              email,
+              createdAt: Date.now()
+            });
+            window.open(data.approveUrl, "_blank", "noopener");
+
+            const done = await waitDone(data.orderId);
+            const status = String(done.status || "").toUpperCase();
+            if (status === "COMPLETED") {
+              setMsg("Pago confirmado. Licencia lista.", "ok");
+              renderLicense(done, username);
+              clearPendingOrder();
+            } else if (status === "TIMEOUT") {
+              setMsg("Tiempo de espera agotado. Si ya pagaste, pulsa Recuperar para traer tu licencia.", "err");
+            } else {
+              setMsg("Pago no completado: " + (done.status || "desconocido"), "err");
+            }
+          } catch (e) {
+            setMsg("Error: " + (e && e.message ? e.message : e), "err");
+          } finally {
+            busy = false;
+            setDisabled(false);
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
+
