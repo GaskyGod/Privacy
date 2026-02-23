@@ -1,4 +1,4 @@
-# Railway Renewal API (Tikplays)
+﻿# Railway Renewal API (Tikplays)
 
 Backend para:
 
@@ -17,6 +17,7 @@ Compra publica:
 - `GET /buy`
 - `POST /purchase/create-order`
 - `GET /purchase/order-status`
+- `POST /purchase/recover-license`
 
 Comunes:
 
@@ -36,6 +37,15 @@ Comunes:
 - `FIREBASE_SERVICE_ACCOUNT_JSON` (JSON completo de service account; tambien acepta base64)
 - `APP_DOWNLOAD_URL` (link publico del instalador para mostrar tras compra web)
 - `WEB_BUY_ALLOWED_ORIGINS` (opcional; dominios permitidos para frontend externo, separado por comas. Ej: `https://tikplays.live,https://www.tikplays.live`. Usa `*` para permitir todos)
+
+Correo de confirmacion (opcional, no bloquea compra):
+
+- `SMTP_HOST`
+- `SMTP_PORT` (ej: `587`)
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_SECURE` (`true` o `false`)
+- `SMTP_FROM` (ej: `Tikplays <ventas@tudominio.com>`)
 
 ## Configuracion en app local
 
@@ -60,10 +70,10 @@ Eventos recomendados:
 
 Si quieres alojar solo el frontend en tu hosting:
 
-1. Sube el archivo `buy-frontend.html` a tu hosting (por ejemplo `https://tu-dominio.com/comprar.html`).
+1. Sube el archivo `buy.html` a tu hosting (por ejemplo `https://tu-dominio.com/comprar.html`).
 2. En ese archivo, ajusta `API_BASE` con tu dominio Railway.
 3. En Railway, configura `WEB_BUY_ALLOWED_ORIGINS` con tu dominio de hosting.
-4. Mantén el webhook de PayPal apuntando a Railway.
+4. MantÃ©n el webhook de PayPal apuntando a Railway.
 
 ## Notas del flujo de compra web
 
@@ -75,3 +85,4 @@ Si quieres alojar solo el frontend en tu hosting:
 - Si no existe, se crea con `deviceId: null` (se reclama luego desde la app).
 
 Sync deploy marker: 2026-02-20T11:14:43
+

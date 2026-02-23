@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tikplays - Comprar SuscripciÃ³n</title>
+  <title>Tikplays - Comprar Suscripción</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; font-family: "Inter", "Segoe UI", system-ui, sans-serif; }
@@ -20,7 +20,7 @@
       padding: 24px;
     }
     .card {
-      width: min(920px, 100%);
+      width: min(1120px, 100%);
       background: #101827d9;
       border: 1px solid #ffffff1a;
       border-radius: 18px;
@@ -29,6 +29,37 @@
     }
     h1 { margin: 0 0 6px; font-size: 30px; }
     .sub { margin: 0 0 18px; color: #9ca3af; }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .mini-chip {
+      border: 1px solid #334155;
+      background: #0b1222;
+      color: #93c5fd;
+      border-radius: 999px;
+      font-size: 12px;
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+    .layout-two {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+    @media (min-width: 980px) { .layout-two { grid-template-columns: 1.25fr .9fr; } }
+    .purchase-panel,
+    .assist-panel {
+      border: 1px solid #3341557a;
+      border-radius: 14px;
+      background: #0b1324bf;
+      padding: 14px;
+    }
     .grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
     @media (min-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
     label { display: block; font-size: 13px; margin: 0 0 6px; color: #cbd5e1; }
@@ -97,8 +128,23 @@
       font-size: 12px;
       color: #94a3b8;
     }
+    .assist-title {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: #f8fafc;
+      font-weight: 800;
+    }
+    .help-note {
+      border: 1px solid #f59e0b66;
+      background: linear-gradient(90deg, #92400e33, #78350f22);
+      color: #fde68a;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
     .support-box {
-      margin-top: 14px;
       border: 1px solid #60a5fa55;
       background: linear-gradient(180deg, #0f172acc, #111827cc);
       border-radius: 12px;
@@ -118,10 +164,9 @@
     }
     .support-actions {
       display: grid;
-      gap: 8px;
+      gap: 10px;
       grid-template-columns: 1fr;
     }
-    @media (min-width: 760px) { .support-actions { grid-template-columns: 1fr auto; } }
     .discord-btn {
       display: inline-flex;
       align-items: center;
@@ -137,24 +182,40 @@
     }
     .recover-row {
       display: grid;
+      gap: 6px;
+      grid-template-columns: 1fr;
+      width: 100%;
+    }
+    .recover-row label {
+      margin: 0;
+      color: #dbeafe;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+    .recover-row input {
+      width: 100%;
+    }
+    .support-btns {
+      display: grid;
       gap: 8px;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
+      width: 100%;
+    }
+    @media (min-width: 1120px) {
+      .support-btns {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .support-btns .recover-btn,
+    .support-btns .discord-btn {
+      width: 100%;
+      justify-content: center;
     }
     .recover-btn {
       background: linear-gradient(135deg, #0f766e, #0d9488);
       border-radius: 10px;
       padding: 10px 12px;
       font-weight: 800;
-    }
-    .paypal-warning {
-      margin-top: 14px;
-      border: 1px solid #f59e0b66;
-      background: linear-gradient(90deg, #92400e33, #78350f22);
-      color: #fde68a;
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 13px;
-      line-height: 1.4;
     }
     .completion-banner {
       position: fixed;
@@ -197,49 +258,62 @@
   </div>
 
   <main class="card">
-    <h1>Compra tu suscripciÃ³n Tikplays</h1>
-    <p class="sub">Tu licencia serÃ¡ tu usuario de TikTok en minÃºsculas y sin arroba.</p>
-
-    <div class="grid">
-      <div>
-        <label for="username">Usuario TikTok</label>
-        <input id="username" placeholder="@tu_usuario" autocomplete="username" />
-      </div>
-      <div>
-        <label for="email">Email</label>
-        <input id="email" type="email" placeholder="tu@email.com" autocomplete="email" />
-      </div>
+    <div class="header-row">
+      <h1>Compra tu suscripción Tikplays</h1>
+      <span class="mini-chip">Pago seguro con PayPal</span>
     </div>
+    <p class="sub">Licencia = usuario TikTok en minúsculas, sin @.</p>
 
-    <div class="plans">
-      <button class="p1" data-plan="1m">1 mes - $14.99</button>
-      <button class="p6" data-plan="6m">6 meses - $59.99</button>
-      <button class="p12" data-plan="12m">1 aÃ±o - $99.99</button>
-    </div>
-
-    <div id="msg" class="msg"></div>
-
-    <section id="result" class="result">
-      <div>Tu licencia:<code id="licenseKeyView"></code></div>
-      <div id="expiresView" style="margin-top:8px;color:#93c5fd"></div>
-      <a id="downloadBtn" class="download" href="#" target="_blank" rel="noopener">Descargar app</a>
-    </section>
-
-    <div class="paypal-warning">
-      <strong>Aviso importante:</strong> si PayPal te muestra un error al final, vuelve a esta pestaÃ±a.
-      Muchas veces el pago sÃ­ se confirma y aquÃ­ mismo te aparecerÃ¡n tu licencia y el botÃ³n de descarga.
-    </div>
-    <section class="support-box">
-      <p class="support-head">¿Pagaste y no ves tu licencia?</p>
-      <p class="support-copy">Puedes verificar tu usuario para recuperar la licencia y descarga. Si no aparece, te ayudamos por Discord.</p>
-      <div class="support-actions">
-        <div class="recover-row">
-          <input id="recoverUsername" placeholder="Tu usuario TikTok (sin @)" />
-          <button id="recoverBtn" class="recover-btn" type="button">Recuperar</button>
+    <div class="layout-two">
+      <section class="purchase-panel">
+        <div class="grid">
+          <div>
+            <label for="username">Usuario TikTok</label>
+            <input id="username" placeholder="@tu_usuario" autocomplete="username" />
+          </div>
+          <div>
+            <label for="email">Email</label>
+            <input id="email" type="email" placeholder="tu@email.com" autocomplete="email" />
+          </div>
         </div>
-        <a class="discord-btn" href="https://discord.gg/tZC5W7mrwh" target="_blank" rel="noopener">Contactar en Discord</a>
-      </div>
-    </section>
+
+        <div class="plans">
+          <button class="p1" data-plan="1m">1 mes - $14.99</button>
+          <button class="p6" data-plan="6m">6 meses - $59.99</button>
+          <button class="p12" data-plan="12m">1 año - $99.99</button>
+        </div>
+
+        <div id="msg" class="msg"></div>
+
+        <section id="result" class="result">
+          <div>Tu licencia:<code id="licenseKeyView"></code></div>
+          <div id="expiresView" style="margin-top:8px;color:#93c5fd"></div>
+          <a id="downloadBtn" class="download" href="#" target="_blank" rel="noopener">Descargar app</a>
+        </section>
+      </section>
+
+      <section class="assist-panel">
+        <p class="assist-title">Ayuda y recuperación</p>
+        <div class="help-note">
+          Si PayPal muestra un error al final, vuelve a esta pestaña. Muchas veces el pago sí se confirma y aquí mismo se habilita tu licencia y descarga.
+        </div>
+
+        <section class="support-box">
+          <p class="support-head">¿Pagaste y no ves tu licencia?</p>
+          <p class="support-copy">Verifica tu usuario o contáctanos por Discord.</p>
+          <div class="support-actions">
+            <div class="recover-row">
+              <label for="recoverUsername">Usuario TikTok con el que compraste</label>
+              <input id="recoverUsername" placeholder="Ejemplo: tuusuario (sin @)" />
+            </div>
+            <div class="support-btns">
+              <button id="recoverBtn" class="recover-btn" type="button">Recuperar licencia</button>
+              <a class="discord-btn" href="https://discord.gg/tZC5W7mrwh" target="_blank" rel="noopener">Contactar en Discord</a>
+            </div>
+          </div>
+        </section>
+      </section>
+    </div>
 
     <p class="foot">Si ya tenias licencia con ese usuario, la compra suma dias sobre tu tiempo actual.</p>
   </main>
@@ -508,4 +582,3 @@
   </script>
 </body>
 </html>
-

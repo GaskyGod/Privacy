@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 function initFirebase() {
   if (admin.apps.length) return;
@@ -41,6 +42,14 @@ const RENEWAL_PROXY_KEY = String(process.env.RENEWAL_PROXY_KEY || '').trim();
 const APP_DOWNLOAD_URL = String(process.env.APP_DOWNLOAD_URL || '').trim();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const WEB_BUY_ALLOWED_ORIGINS = String(process.env.WEB_BUY_ALLOWED_ORIGINS || '*').trim();
+const SMTP_HOST = String(process.env.SMTP_HOST || '').trim();
+const SMTP_PORT = Number(String(process.env.SMTP_PORT || '587').trim());
+const SMTP_USER = String(process.env.SMTP_USER || '').trim();
+const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
+const SMTP_SECURE = String(process.env.SMTP_SECURE || 'false').trim().toLowerCase() === 'true';
+const SMTP_FROM = String(process.env.SMTP_FROM || '').trim();
+const MAIL_ENABLED = Boolean(SMTP_HOST && Number.isFinite(SMTP_PORT) && SMTP_USER && SMTP_PASS && SMTP_FROM);
+let mailTransport = null;
 
 function normalizeTikTokUsername(input) {
   const raw = String(input || '').trim();
@@ -131,6 +140,113 @@ function requireProxyKey(req, res) {
   if (incoming && incoming === RENEWAL_PROXY_KEY) return true;
   res.status(401).json({ ok: false, reason: 'Unauthorized' });
   return false;
+}
+
+function getMailTransport() {
+  if (!MAIL_ENABLED) return null;
+  if (mailTransport) return mailTransport;
+  mailTransport = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  });
+  return mailTransport;
+}
+
+function fmtDateLocal(ms) {
+  if (!ms || !Number.isFinite(ms)) return 'No disponible';
+  try {
+    return new Date(ms).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return new Date(ms).toISOString();
+  }
+}
+
+async function sendPurchaseEmailForOrderId(orderId) {
+  if (!MAIL_ENABLED) return { ok: false, skipped: true, reason: 'MAIL_NOT_CONFIGURED' };
+
+  const q = await db.collection('licensePurchases').where('orderId', '==', orderId).limit(1).get();
+  if (q.empty) return { ok: false, skipped: true, reason: 'PURCHASE_NOT_FOUND' };
+  const purchaseRef = q.docs[0].ref;
+  const purchase = q.docs[0].data() || {};
+
+  const status = String(purchase.status || '').toUpperCase();
+  if (status !== 'COMPLETED') return { ok: false, skipped: true, reason: 'PURCHASE_NOT_COMPLETED' };
+  if (String(purchase.emailStatus || '').toUpperCase() === 'SENT') {
+    return { ok: true, skipped: true, reason: 'ALREADY_SENT' };
+  }
+
+  const to = String(purchase.email || '').trim().toLowerCase();
+  const licenseKey = String(purchase.licenseKey || '').trim();
+  const downloadUrl = String(purchase.downloadUrl || APP_DOWNLOAD_URL || '').trim();
+  const expiresAtMs = Number(purchase.newExpiresAt || 0) || null;
+  const planId = String(purchase.planId || '').trim();
+  const daysAdded = Number(purchase.daysAdded || purchase.days || 0) || 0;
+  const amount = String(purchase.amount || '').trim();
+
+  if (!to || !EMAIL_RE.test(to)) {
+    await purchaseRef.set({
+      emailStatus: 'FAILED',
+      emailLastError: 'EMAIL_INVALID',
+      emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return { ok: false, reason: 'EMAIL_INVALID' };
+  }
+
+  const transport = getMailTransport();
+  if (!transport) return { ok: false, skipped: true, reason: 'MAIL_NOT_CONFIGURED' };
+
+  const subject = `Tikplays: compra confirmada (${licenseKey})`;
+  const text = [
+    'Tu compra de Tikplays fue confirmada.',
+    '',
+    `Licencia: ${licenseKey}`,
+    `Plan: ${planId}`,
+    `Dias agregados: ${daysAdded}`,
+    `Monto: $${amount} USD`,
+    `Vence: ${fmtDateLocal(expiresAtMs)}`,
+    '',
+    `Descarga: ${downloadUrl}`,
+    '',
+    'Si tienes dudas, responde este correo o contáctanos por Discord.'
+  ].join('\n');
+  const html = `
+  <div style="font-family:Segoe UI,Arial,sans-serif;color:#0f172a;">
+    <h2 style="margin:0 0 12px;">Compra confirmada</h2>
+    <p style="margin:0 0 14px;">Tu compra de Tikplays fue confirmada correctamente.</p>
+    <p style="margin:0 0 6px;"><b>Licencia:</b> ${licenseKey}</p>
+    <p style="margin:0 0 6px;"><b>Plan:</b> ${planId}</p>
+    <p style="margin:0 0 6px;"><b>Días agregados:</b> ${daysAdded}</p>
+    <p style="margin:0 0 6px;"><b>Monto:</b> $${amount} USD</p>
+    <p style="margin:0 0 14px;"><b>Vence:</b> ${fmtDateLocal(expiresAtMs)}</p>
+    <a href="${downloadUrl}" style="display:inline-block;background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;">Descargar app</a>
+  </div>`;
+
+  try {
+    await transport.sendMail({
+      from: SMTP_FROM,
+      to,
+      subject,
+      text,
+      html
+    });
+    await purchaseRef.set({
+      emailStatus: 'SENT',
+      emailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+      emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+      emailLastError: admin.firestore.FieldValue.delete()
+    }, { merge: true });
+    return { ok: true };
+  } catch (err) {
+    const reason = String(err?.message || err || 'MAIL_SEND_FAILED').slice(0, 700);
+    await purchaseRef.set({
+      emailStatus: 'FAILED',
+      emailLastError: reason,
+      emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return { ok: false, reason };
+  }
 }
 
 async function paypalAccessToken() {
@@ -732,7 +848,17 @@ app.post('/paypalWebhook', async (req, res) => {
     }
 
     const purchaseResult = await completePurchaseByOrderId(orderId);
-    if (purchaseResult.ok) return res.json({ ok: true, flow: 'purchase' });
+    if (purchaseResult.ok) {
+      try {
+        const mailRes = await sendPurchaseEmailForOrderId(orderId);
+        if (!mailRes.ok && !mailRes.skipped) {
+          console.warn('[purchase] email send failed', { orderId, reason: mailRes.reason || 'unknown' });
+        }
+      } catch (mailErr) {
+        console.warn('[purchase] email send error', { orderId, error: String(mailErr?.message || mailErr) });
+      }
+      return res.json({ ok: true, flow: 'purchase' });
+    }
     if (purchaseResult.code && purchaseResult.code !== 404) {
       return res.status(purchaseResult.code || 500).json({ ok: false, reason: purchaseResult.reason || 'No se pudo completar compra' });
     }
