@@ -48,6 +48,8 @@ const SMTP_USER = String(process.env.SMTP_USER || '').trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
 const SMTP_SECURE = String(process.env.SMTP_SECURE || 'false').trim().toLowerCase() === 'true';
 const SMTP_FROM = String(process.env.SMTP_FROM || '').trim();
+const BREVO_API_KEY = String(process.env.BREVO_API_KEY || '').trim();
+const BREVO_API_BASE = 'https://api.brevo.com/v3';
 const MAIL_ENABLED = Boolean(SMTP_HOST && Number.isFinite(SMTP_PORT) && SMTP_USER && SMTP_PASS && SMTP_FROM);
 let mailTransport = null;
 
@@ -163,8 +165,53 @@ function fmtDateLocal(ms) {
   }
 }
 
+function parseFromAddress(rawFrom) {
+  const raw = String(rawFrom || '').trim();
+  if (!raw) return { name: null, email: null };
+  const m = raw.match(/^(.*)<([^>]+)>$/);
+  if (m) {
+    const name = String(m[1] || '').trim().replace(/^"|"$/g, '');
+    const email = String(m[2] || '').trim();
+    return { name: name || null, email: email || null };
+  }
+  return { name: null, email: raw };
+}
+
+async function sendEmailViaBrevoApi({ to, subject, text, html }) {
+  if (!BREVO_API_KEY) return { ok: false, skipped: true, reason: 'BREVO_API_NOT_CONFIGURED' };
+  const fromParsed = parseFromAddress(SMTP_FROM);
+  if (!fromParsed.email) return { ok: false, skipped: true, reason: 'SMTP_FROM_INVALID' };
+
+  const body = {
+    sender: {
+      email: fromParsed.email,
+      ...(fromParsed.name ? { name: fromParsed.name } : {})
+    },
+    to: [{ email: to }],
+    subject,
+    textContent: text,
+    htmlContent: html
+  };
+
+  const resp = await fetch(`${BREVO_API_BASE}/smtp/email`, {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'api-key': BREVO_API_KEY
+    },
+    body: JSON.stringify(body)
+  });
+  const js = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    const msg = String(js?.message || js?.code || resp.statusText || `HTTP_${resp.status}`);
+    return { ok: false, reason: msg };
+  }
+  return { ok: true, provider: 'brevo-api' };
+}
+
 async function sendPurchaseEmailForOrderId(orderId) {
-  if (!MAIL_ENABLED) return { ok: false, skipped: true, reason: 'MAIL_NOT_CONFIGURED' };
+  if (!BREVO_API_KEY && !MAIL_ENABLED) return { ok: false, skipped: true, reason: 'MAIL_NOT_CONFIGURED' };
 
   const q = await db.collection('licensePurchases').where('orderId', '==', orderId).limit(1).get();
   if (q.empty) return { ok: false, skipped: true, reason: 'PURCHASE_NOT_FOUND' };
@@ -194,9 +241,6 @@ async function sendPurchaseEmailForOrderId(orderId) {
     return { ok: false, reason: 'EMAIL_INVALID' };
   }
 
-  const transport = getMailTransport();
-  if (!transport) return { ok: false, skipped: true, reason: 'MAIL_NOT_CONFIGURED' };
-
   const subject = `Tikplays: compra confirmada (${licenseKey})`;
   const text = [
     'Tu compra de Tikplays fue confirmada.',
@@ -224,15 +268,36 @@ async function sendPurchaseEmailForOrderId(orderId) {
   </div>`;
 
   try {
-    await transport.sendMail({
-      from: SMTP_FROM,
-      to,
-      subject,
-      text,
-      html
-    });
+    let sendRes = null;
+    if (BREVO_API_KEY) {
+      sendRes = await sendEmailViaBrevoApi({ to, subject, text, html });
+    } else {
+      const transport = getMailTransport();
+      if (!transport) return { ok: false, skipped: true, reason: 'MAIL_NOT_CONFIGURED' };
+      await transport.sendMail({
+        from: SMTP_FROM,
+        to,
+        subject,
+        text,
+        html
+      });
+      sendRes = { ok: true, provider: 'smtp' };
+    }
+
+    if (!sendRes?.ok) {
+      const reason = String(sendRes?.reason || 'MAIL_SEND_FAILED').slice(0, 700);
+      await purchaseRef.set({
+        emailStatus: 'FAILED',
+        emailProvider: BREVO_API_KEY ? 'brevo-api' : 'smtp',
+        emailLastError: reason,
+        emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      return { ok: false, reason };
+    }
+
     await purchaseRef.set({
       emailStatus: 'SENT',
+      emailProvider: sendRes.provider || (BREVO_API_KEY ? 'brevo-api' : 'smtp'),
       emailSentAt: admin.firestore.FieldValue.serverTimestamp(),
       emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
       emailLastError: admin.firestore.FieldValue.delete()

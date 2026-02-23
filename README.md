@@ -40,6 +40,7 @@ Comunes:
 
 Correo de confirmacion (opcional, no bloquea compra):
 
+- `BREVO_API_KEY` (recomendado; si existe se usa API HTTP de Brevo en lugar de SMTP)
 - `SMTP_HOST`
 - `SMTP_PORT` (ej: `587`)
 - `SMTP_USER`
