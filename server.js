@@ -31,6 +31,7 @@ app.use(express.json({
   }
 }));
 
+const licenseRateBuckets = new Map();
 const PLAN_DAYS = { '1m': 30, '6m': 180, '12m': 365 };
 const PLAN_ENV = { '1m': 'PRICE_1M_USD', '6m': 'PRICE_6M_USD', '12m': 'PRICE_12M_USD' };
 const PAYPAL_MODE = String(process.env.PAYPAL_MODE || 'sandbox').toLowerCase() === 'live' ? 'live' : 'sandbox';
@@ -52,6 +53,104 @@ const BREVO_API_KEY = String(process.env.BREVO_API_KEY || '').trim();
 const BREVO_API_BASE = 'https://api.brevo.com/v3';
 const MAIL_ENABLED = Boolean(SMTP_HOST && Number.isFinite(SMTP_PORT) && SMTP_USER && SMTP_PASS && SMTP_FROM);
 let mailTransport = null;
+
+function clientIp(req) {
+  return String(
+    req.headers?.['cf-connecting-ip'] ||
+    req.headers?.['x-real-ip'] ||
+    String(req.headers?.['x-forwarded-for'] || '').split(',')[0] ||
+    req.ip ||
+    req.socket?.remoteAddress ||
+    ''
+  ).trim();
+}
+
+function auditSafe(value, max = 160) {
+  return String(value || '').trim().slice(0, max);
+}
+
+function auditLicenseEvent(req, action, details = {}) {
+  const event = {
+    timestamp: new Date().toISOString(),
+    action,
+    username: auditSafe(details.username || details.licenseKey || details.key),
+    result: auditSafe(details.result || ''),
+    ip: clientIp(req),
+    userAgent: auditSafe(req.headers?.['user-agent'], 260),
+    deviceId: auditSafe(details.deviceId),
+    orderId: auditSafe(details.orderId),
+    endpoint: auditSafe(req.originalUrl || req.url),
+    rejectionReason: auditSafe(details.rejectionReason || details.reason)
+  };
+  console.log('[license-audit]', event);
+}
+
+function licenseRateLimit({ windowMs = 60_000, max = 60 } = {}) {
+  return (req, res, next) => {
+    const bucketKey = `${req.method}:${req.path}:${clientIp(req)}`;
+    const now = Date.now();
+    const bucket = licenseRateBuckets.get(bucketKey) || { resetAt: now + windowMs, count: 0 };
+    if (bucket.resetAt <= now) {
+      bucket.resetAt = now + windowMs;
+      bucket.count = 0;
+    }
+    bucket.count += 1;
+    licenseRateBuckets.set(bucketKey, bucket);
+    if (bucket.count > max) {
+      auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'RATE_LIMITED', reason: 'rate limit exceeded' });
+      return res.status(429).json({ ok: false, reason: 'Demasiados intentos. Intenta de nuevo mas tarde.' });
+    }
+    next();
+  };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of licenseRateBuckets.entries()) {
+    if (bucket.resetAt <= now) licenseRateBuckets.delete(key);
+  }
+}, 300_000).unref?.();
+
+function normalizeLicenseKey(input) {
+  const value = String(input || '').trim().replace(/^@+/, '').toLowerCase();
+  if (value.length < 3 || value.length > 64) return { ok: false, reason: 'licencia invalida: longitud 3..64' };
+  if (!/^[a-z0-9._-]+$/.test(value)) return { ok: false, reason: 'licencia invalida: caracteres no permitidos' };
+  return { ok: true, value };
+}
+
+function normalizeDeviceId(input) {
+  const value = String(input || '').trim();
+  if (value.length < 8 || value.length > 160) return { ok: false, reason: 'deviceId invalido' };
+  if (!/^[a-zA-Z0-9._:\-{}]+$/.test(value)) return { ok: false, reason: 'deviceId invalido' };
+  return { ok: true, value };
+}
+
+function licenseTimeState(licenseData) {
+  const now = Date.now();
+  const expiresAtMs = getExpiresAtMs(licenseData);
+  const diff = expiresAtMs ? expiresAtMs - now : null;
+  return {
+    expiresAtMs,
+    isExpired: expiresAtMs ? diff <= 0 : false,
+    daysRemaining: expiresAtMs ? Math.max(0, Math.floor(diff / 86_400_000)) : null,
+    hoursRemaining: expiresAtMs ? Math.max(0, Math.floor(diff / 3_600_000)) : null
+  };
+}
+
+function publicLicenseStatus(licenseKey, deviceId, data) {
+  const state = licenseTimeState(data);
+  return {
+    ok: true,
+    licenseKey,
+    deviceId,
+    active: data.active === true,
+    plan: data.plan || null,
+    expiresAtMs: state.expiresAtMs,
+    daysRemaining: state.daysRemaining,
+    hoursRemaining: state.hoursRemaining,
+    isExpired: state.isExpired
+  };
+}
 
 function normalizeTikTokUsername(input) {
   const raw = String(input || '').trim();
@@ -466,6 +565,206 @@ async function completePurchaseByOrderId(orderId) {
   return { ok: true };
 }
 
+app.get('/app/meta', licenseRateLimit({ windowMs: 60_000, max: 120 }), async (req, res) => {
+  try {
+    const snap = await db.doc('app/meta').get();
+    if (!snap.exists) return res.json({ ok: false, reason: 'meta not found' });
+    const d = snap.data() || {};
+    return res.json({
+      ok: true,
+      meta: {
+        currentVersion: d.currentVersion || '0.0.0',
+        minSupported: d.minSupported || '0.0.0',
+        changelog: d.changelog || '',
+        downloadUrlWin: d.downloadUrlWin || d.downloadUrl || '',
+        downloadUrlMac: d.downloadUrlMac || '',
+        downloadUrlLinux: d.downloadUrlLinux || ''
+      }
+    });
+  } catch (e) {
+    auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'ERROR', reason: 'app meta read failed' });
+    return res.status(500).json({ ok: false, reason: 'Error servidor' });
+  }
+});
+
+app.post('/license/validate', licenseRateLimit({ windowMs: 60_000, max: 30 }), async (req, res) => {
+  const keyCheck = normalizeLicenseKey(req.body?.key);
+  const devCheck = normalizeDeviceId(req.body?.deviceId);
+  if (!keyCheck.ok || !devCheck.ok) {
+    const reason = !keyCheck.ok ? keyCheck.reason : devCheck.reason;
+    auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'REJECTED', key: req.body?.key, deviceId: req.body?.deviceId, reason });
+    return res.status(400).json({ ok: false, reason });
+  }
+
+  const key = keyCheck.value;
+  const deviceId = devCheck.value;
+  try {
+    const snap = await db.collection('licenses').doc(key).get();
+    if (!snap.exists) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'NO_LICENSE', key, deviceId, reason: 'La licencia no existe' });
+      return res.json({ ok: false, code: 'NO_LICENSE', reason: 'La licencia no existe' });
+    }
+    const data = snap.data() || {};
+    if (data.active !== true) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'INACTIVE', key, deviceId, reason: 'Licencia inactiva' });
+      return res.json({ ok: false, code: 'INACTIVE', reason: 'Licencia inactiva' });
+    }
+    const state = licenseTimeState(data);
+    if (state.isExpired) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'EXPIRED', key, deviceId, reason: 'Suscripcion vencida' });
+      return res.json({ ok: false, code: 'EXPIRED', reason: 'Suscripcion vencida', expiresAtMs: state.expiresAtMs, daysRemaining: 0, isExpired: true });
+    }
+    if (!data.deviceId) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'UNCLAIMED', key, deviceId });
+      return res.json({ ok: true, status: 'UNCLAIMED', expiresAtMs: state.expiresAtMs, daysRemaining: state.daysRemaining, hoursRemaining: state.hoursRemaining, isExpired: false });
+    }
+    if (String(data.deviceId) !== deviceId) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'DEVICE_MISMATCH', key, deviceId, reason: 'Licencia ya reclamada por otra PC' });
+      return res.json({ ok: false, code: 'DEVICE_MISMATCH', reason: 'Licencia ya reclamada por otra PC' });
+    }
+    await snap.ref.update({ lastSeen: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'MATCH', key, deviceId });
+    return res.json({ ok: true, status: 'MATCH', expiresAtMs: state.expiresAtMs, daysRemaining: state.daysRemaining, hoursRemaining: state.hoursRemaining, isExpired: false });
+  } catch (e) {
+    auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'ERROR', key, deviceId, reason: 'Error servidor' });
+    return res.status(500).json({ ok: false, reason: 'Error servidor' });
+  }
+});
+
+app.post('/license/claim', licenseRateLimit({ windowMs: 60_000, max: 12 }), async (req, res) => {
+  const keyCheck = normalizeLicenseKey(req.body?.key);
+  const devCheck = normalizeDeviceId(req.body?.deviceId);
+  if (!keyCheck.ok || !devCheck.ok) {
+    const reason = !keyCheck.ok ? keyCheck.reason : devCheck.reason;
+    auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'REJECTED', key: req.body?.key, deviceId: req.body?.deviceId, reason });
+    return res.status(400).json({ ok: false, reason });
+  }
+
+  const key = keyCheck.value;
+  const deviceId = devCheck.value;
+  try {
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection('licenses').doc(key);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error('NO_LICENSE');
+      const data = snap.data() || {};
+      if (data.active !== true) throw new Error('INACTIVE');
+      const state = licenseTimeState(data);
+      if (state.isExpired) throw new Error('EXPIRED');
+      if (data.deviceId && String(data.deviceId) !== deviceId) throw new Error('ALREADY_CLAIMED');
+
+      if (!data.deviceId) {
+        tx.update(ref, {
+          deviceId,
+          claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastSeen: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        tx.update(ref, { lastSeen: admin.firestore.FieldValue.serverTimestamp() });
+      }
+    });
+    auditLicenseEvent(req, 'LICENSE_CLAIM', { result: 'SUCCESS', key, deviceId });
+    return res.json({ ok: true });
+  } catch (e) {
+    const code = String(e?.message || 'SERVER_ERROR');
+    const status = code === 'SERVER_ERROR' ? 500 : 200;
+    const reasonByCode = {
+      NO_LICENSE: 'La licencia no existe',
+      INACTIVE: 'Licencia inactiva',
+      EXPIRED: 'Suscripcion vencida',
+      ALREADY_CLAIMED: 'Licencia ya reclamada por otra PC'
+    };
+    const reason = reasonByCode[code] || 'Error servidor';
+    auditLicenseEvent(req, code === 'ALREADY_CLAIMED' ? 'LICENSE_DEVICE_CHANGE' : 'LICENSE_REJECTED', { result: code, key, deviceId, reason });
+    return res.status(status).json({ ok: false, code, reason });
+  }
+});
+
+app.get('/license/status', licenseRateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
+  const keyCheck = normalizeLicenseKey(req.query?.licenseKey || req.query?.key);
+  const devCheck = normalizeDeviceId(req.query?.deviceId);
+  if (!keyCheck.ok || !devCheck.ok) {
+    const reason = !keyCheck.ok ? keyCheck.reason : devCheck.reason;
+    auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'REJECTED', key: req.query?.licenseKey || req.query?.key, deviceId: req.query?.deviceId, reason });
+    return res.status(400).json({ ok: false, reason });
+  }
+
+  const key = keyCheck.value;
+  const deviceId = devCheck.value;
+  try {
+    const snap = await db.collection('licenses').doc(key).get();
+    if (!snap.exists) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'NO_LICENSE', key, deviceId, reason: 'La licencia no existe' });
+      return res.status(404).json({ ok: false, code: 'NO_LICENSE', reason: 'La licencia no existe' });
+    }
+    const data = snap.data() || {};
+    if (data.active !== true) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'INACTIVE', key, deviceId, reason: 'Licencia inactiva' });
+      return res.status(400).json({ ok: false, code: 'INACTIVE', reason: 'Licencia inactiva' });
+    }
+    if (!data.deviceId || String(data.deviceId) !== deviceId) {
+      auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'DEVICE_MISMATCH', key, deviceId, reason: 'Licencia no corresponde a este dispositivo' });
+      return res.status(403).json({ ok: false, code: 'DEVICE_MISMATCH', reason: 'Licencia no corresponde a este dispositivo' });
+    }
+    const status = publicLicenseStatus(key, deviceId, data);
+    auditLicenseEvent(req, status.isExpired ? 'LICENSE_VALIDATE_FAILED' : 'LICENSE_VALIDATE_SUCCESS', {
+      result: status.isExpired ? 'EXPIRED' : 'SUCCESS',
+      key,
+      deviceId,
+      reason: status.isExpired ? 'Suscripcion vencida' : ''
+    });
+    return res.json(status);
+  } catch (e) {
+    auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'ERROR', key, deviceId, reason: 'Error servidor' });
+    return res.status(500).json({ ok: false, reason: 'Error servidor' });
+  }
+});
+
+app.post('/license/heartbeat', licenseRateLimit({ windowMs: 60_000, max: 120 }), async (req, res) => {
+  const keyCheck = normalizeLicenseKey(req.body?.key);
+  if (!keyCheck.ok) {
+    auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'REJECTED', key: req.body?.key, reason: keyCheck.reason });
+    return res.status(400).json({ ok: false, reason: keyCheck.reason });
+  }
+  try {
+    await db.collection('licenses').doc(keyCheck.value).update({ lastSeen: admin.firestore.FieldValue.serverTimestamp() });
+    auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'HEARTBEAT', key: keyCheck.value });
+    return res.json({ ok: true });
+  } catch {
+    auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'HEARTBEAT_FAILED', key: keyCheck.value, reason: 'Error servidor' });
+    return res.status(500).json({ ok: false, reason: 'Error servidor' });
+  }
+});
+
+app.post('/license/live-connection', licenseRateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
+  const keyCheck = normalizeLicenseKey(req.body?.licenseKey);
+  const liveUsername = normalizeTikTokUsername(req.body?.liveUsername);
+  if (!keyCheck.ok || !liveUsername.ok) {
+    const reason = !keyCheck.ok ? keyCheck.reason : liveUsername.reason;
+    auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'REJECTED', key: req.body?.licenseKey, deviceId: req.body?.deviceId, reason });
+    return res.status(400).json({ ok: false, reason });
+  }
+  try {
+    await db.collection('licenses').doc(keyCheck.value).collection('liveConnections').add({
+      licenseKey: keyCheck.value,
+      deviceId: auditSafe(req.body?.deviceId),
+      liveUsername: liveUsername.value,
+      liveDisplayName: auditSafe(req.body?.liveDisplayName || liveUsername.value),
+      method: auditSafe(req.body?.method || 'connector'),
+      roomId: auditSafe(req.body?.roomId),
+      ip: auditSafe(req.body?.ip || clientIp(req)),
+      userAgent: auditSafe(req.body?.userAgent || req.headers?.['user-agent'], 260),
+      connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      connectedAtMs: Date.now()
+    });
+    auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'LIVE_CONNECTION', key: keyCheck.value, deviceId: req.body?.deviceId });
+    return res.json({ ok: true });
+  } catch {
+    auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'LIVE_CONNECTION_FAILED', key: keyCheck.value, deviceId: req.body?.deviceId, reason: 'Error servidor' });
+    return res.status(500).json({ ok: false, reason: 'Error servidor' });
+  }
+});
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, mode: PAYPAL_MODE });
 });
@@ -616,8 +915,6 @@ app.get('/buy', (_req, res) => {
 });
 
 app.post('/createRenewalOrder', async (req, res) => {
-  if (!requireProxyKey(req, res)) return;
-
   const planId = String(req.body?.planId || '').trim();
   const licenseKey = String(req.body?.licenseKey || '').trim();
   const deviceId = String(req.body?.deviceId || '').trim();
@@ -821,8 +1118,6 @@ app.post('/purchase/recover-license', async (req, res) => {
 });
 
 app.get('/getRenewalOrderStatus', async (req, res) => {
-  if (!requireProxyKey(req, res)) return;
-
   const orderId = String(req.query?.orderId || '').trim();
   const licenseKey = String(req.query?.licenseKey || '').trim();
   const deviceId = String(req.query?.deviceId || '').trim();
