@@ -41,6 +41,9 @@ const PAYPAL_CLIENT_SECRET = String(process.env.PAYPAL_CLIENT_SECRET || '').trim
 const PAYPAL_WEBHOOK_ID = String(process.env.PAYPAL_WEBHOOK_ID || '').trim();
 const RENEWAL_PROXY_KEY = String(process.env.RENEWAL_PROXY_KEY || '').trim();
 const APP_DOWNLOAD_URL = String(process.env.APP_DOWNLOAD_URL || '').trim();
+const ASURE_ROYALE_KEY = String(process.env.ASURE_ROYALE_KEY || '').trim();
+const ASURE_ROYALE_BASE = 'https://gateway.asure.live/v1/royale/partner';
+const LDPLAYER_INSTALLER_URL = String(process.env.LDPLAYER_INSTALLER_URL || '').trim();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const WEB_BUY_ALLOWED_ORIGINS = String(process.env.WEB_BUY_ALLOWED_ORIGINS || '*').trim();
 const SMTP_HOST = String(process.env.SMTP_HOST || '').trim();
@@ -241,6 +244,117 @@ function requireProxyKey(req, res) {
   if (incoming && incoming === RENEWAL_PROXY_KEY) return true;
   res.status(401).json({ ok: false, reason: 'Unauthorized' });
   return false;
+}
+
+const ROYALE_CARDS = new Set([
+  'Knight', 'Archer', 'Goblins', 'Giant', 'Pekka', 'Minions', 'Balloon', 'Witch',
+  'Barbarians', 'Golem', 'Skeletons', 'Valkyrie', 'SkeletonArmy', 'Bomber',
+  'Musketeer', 'BabyDragon', 'Prince', 'Wizard', 'MiniPekka', 'SpearGoblins',
+  'GiantSkeleton', 'HogRider', 'MinionHorde', 'IceWizard', 'RoyalGiant',
+  'SkeletonWarriors', 'Princess', 'DarkPrince', 'ThreeMusketeers', 'LavaHound',
+  'IceSpirits', 'FireSpirits', 'Miner', 'ZapMachine', 'Bowler', 'RageBarbarian',
+  'BattleRam', 'InfernoDragon', 'IceGolemite', 'MegaMinion', 'BlowdartGoblin',
+  'GoblinGang', 'ElectroWizard', 'AngryBarbarians', 'AxeMan', 'Assassin',
+  'DarkWitch', 'Bats', 'MovingCannon', 'MegaKnight', 'SkeletonBalloon',
+  'DartBarrell', 'Cannon', 'GoblinHut', 'Mortar', 'InfernoTower', 'BombTower',
+  'BarbarianHut', 'Tesla', 'Elixir Collector', 'Xbow', 'Tombstone',
+  'FirespiritHut', 'Fireball', 'Arrows', 'Rage', 'Rocket', 'GoblinBarrel',
+  'Freeze', 'Mirror', 'Lightning', 'Zap', 'Poison', 'Graveyard', 'Log',
+  'Tornado', 'Clone', 'Heal'
+]);
+
+function royaleExternalUserId(licenseKey, deviceId) {
+  const hash = crypto.createHash('sha256').update(`${licenseKey}:${deviceId}`).digest('hex').slice(0, 32);
+  return `tp:${hash}`;
+}
+
+async function validateRoyaleLicense(req, res) {
+  if (!requireProxyKey(req, res)) return null;
+  const keyCheck = normalizeLicenseKey(req.body?.licenseKey || req.query?.licenseKey);
+  const devCheck = normalizeDeviceId(req.body?.deviceId || req.query?.deviceId);
+  if (!keyCheck.ok || !devCheck.ok) {
+    const reason = !keyCheck.ok ? keyCheck.reason : devCheck.reason;
+    res.status(400).json({ ok: false, code: 'INVALID_LICENSE_PAYLOAD', reason });
+    return null;
+  }
+
+  const licenseKey = keyCheck.value;
+  const deviceId = devCheck.value;
+  try {
+    const snap = await db.collection('licenses').doc(licenseKey).get();
+    if (!snap.exists) {
+      res.status(404).json({ ok: false, code: 'NO_LICENSE', reason: 'La licencia no existe' });
+      return null;
+    }
+    const data = snap.data() || {};
+    const time = licenseTimeState(data);
+    if (data.active !== true || time.isExpired) {
+      res.status(403).json({ ok: false, code: time.isExpired ? 'EXPIRED' : 'INACTIVE', reason: time.isExpired ? 'Suscripcion vencida' : 'Licencia inactiva' });
+      return null;
+    }
+    if (!data.deviceId || String(data.deviceId) !== deviceId) {
+      res.status(403).json({ ok: false, code: 'DEVICE_MISMATCH', reason: 'Licencia no corresponde a este dispositivo' });
+      return null;
+    }
+    await snap.ref.update({ lastSeen: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    return { licenseKey, deviceId, externalUserId: royaleExternalUserId(licenseKey, deviceId) };
+  } catch (e) {
+    console.error('[royale] license validation error', e);
+    res.status(500).json({ ok: false, code: 'SERVER_ERROR', reason: 'Error servidor' });
+    return null;
+  }
+}
+
+async function callAsureRoyale(pathname, { method = 'GET', body } = {}) {
+  if (!ASURE_ROYALE_KEY) {
+    return { ok: false, status: 500, data: { error: 'server_misconfigured', reason: 'ASURE_ROYALE_KEY no configurada' } };
+  }
+  const url = `${ASURE_ROYALE_BASE}${pathname}`;
+  const headers = { 'x-asure-royale-partner-key': ASURE_ROYALE_KEY };
+  if (body) headers['Content-Type'] = 'application/json';
+  const resp = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await resp.json().catch(() => ({}));
+  const retryAfter = Number(resp.headers.get('Retry-After')) || null;
+  if (retryAfter && data && typeof data === 'object') data.retryAfter = retryAfter;
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+function sanitizeRoyaleActions(actions) {
+  if (!Array.isArray(actions) || actions.length < 1 || actions.length > 50) {
+    return { ok: false, reason: 'actions debe tener entre 1 y 50 elementos' };
+  }
+  const now = Date.now();
+  const clean = [];
+  for (const raw of actions) {
+    const card = String(raw?.card || '').trim();
+    const lane = String(raw?.lane || 'random').trim();
+    if (!ROYALE_CARDS.has(card)) return { ok: false, reason: `Carta invalida: ${card}` };
+    if (!['left', 'right', 'random'].includes(lane)) return { ok: false, reason: `Carril invalido: ${lane}` };
+    const count = Math.max(1, Math.min(20, parseInt(raw?.count, 10) || 1));
+    const createdAt = Number(raw?.createdAt) || now;
+    const expiresAt = Number(raw?.expiresAt) > now ? Number(raw.expiresAt) : now + 30000;
+    const priority = raw?.metadata?.priority === 'low' ? 'low' : 'high';
+    const action = {
+      id: String(raw?.id || crypto.randomUUID()),
+      type: 'spawn',
+      card,
+      count,
+      lane,
+      createdAt,
+      expiresAt,
+      metadata: { source: 'binding', priority }
+    };
+    const actorId = String(raw?.tiktokActorId || '').trim();
+    const displayName = String(raw?.tiktokDisplayName || '').trim();
+    if (actorId) action.tiktokActorId = actorId.slice(0, 128);
+    if (displayName) action.tiktokDisplayName = displayName.slice(0, 64);
+    clean.push(action);
+  }
+  return { ok: true, actions: clean };
 }
 
 function getMailTransport() {
@@ -767,6 +881,78 @@ app.post('/license/live-connection', licenseRateLimit({ windowMs: 60_000, max: 6
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, mode: PAYPAL_MODE });
+});
+
+app.get('/royale/installer', licenseRateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
+  const session = await validateRoyaleLicense(req, res);
+  if (!session) return;
+  return res.json({ ok: true, installerUrl: LDPLAYER_INSTALLER_URL });
+});
+
+app.post('/royale/link-device', licenseRateLimit({ windowMs: 60_000, max: 30 }), async (req, res) => {
+  const session = await validateRoyaleLicense(req, res);
+  if (!session) return;
+  const openUdid = String(req.body?.openUdid || '').trim();
+  if (!/^[0-9a-fA-F]{8,64}$/.test(openUdid)) {
+    return res.status(400).json({ ok: false, error: 'invalid_openudid', reason: 'openUdid invalido' });
+  }
+  try {
+    const out = await callAsureRoyale('/link/device', {
+      method: 'POST',
+      body: { externalUserId: session.externalUserId, openUdid }
+    });
+    return res.status(out.status).json({ ok: out.ok, externalUserId: session.externalUserId, ...out.data });
+  } catch (e) {
+    console.error('[royale] link-device error', e);
+    return res.status(502).json({ ok: false, error: 'upstream_unavailable', reason: 'No se pudo contactar Asure Royale' });
+  }
+});
+
+app.get('/royale/link-status', licenseRateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
+  const session = await validateRoyaleLicense(req, res);
+  if (!session) return;
+  try {
+    const out = await callAsureRoyale(`/link?externalUserId=${encodeURIComponent(session.externalUserId)}`);
+    return res.status(out.status).json({ ok: out.ok, externalUserId: session.externalUserId, ...out.data });
+  } catch (e) {
+    console.error('[royale] link-status error', e);
+    return res.status(502).json({ ok: false, error: 'upstream_unavailable', reason: 'No se pudo contactar Asure Royale' });
+  }
+});
+
+app.get('/royale/status', licenseRateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
+  const session = await validateRoyaleLicense(req, res);
+  if (!session) return;
+  try {
+    const out = await callAsureRoyale(`/status?externalUserId=${encodeURIComponent(session.externalUserId)}`);
+    return res.status(out.status).json({ ok: out.ok, externalUserId: session.externalUserId, ...out.data });
+  } catch (e) {
+    console.error('[royale] status error', e);
+    return res.status(502).json({ ok: false, error: 'upstream_unavailable', reason: 'No se pudo contactar Asure Royale' });
+  }
+});
+
+app.post('/royale/spawn', licenseRateLimit({ windowMs: 60_000, max: 120 }), async (req, res) => {
+  const session = await validateRoyaleLicense(req, res);
+  if (!session) return;
+  const clean = sanitizeRoyaleActions(req.body?.actions);
+  if (!clean.ok) return res.status(400).json({ ok: false, error: 'invalid_body', reason: clean.reason });
+  const pushBatchId = String(req.body?.pushBatchId || crypto.randomUUID()).trim();
+  try {
+    const out = await callAsureRoyale('/spawn', {
+      method: 'POST',
+      body: {
+        externalUserId: session.externalUserId,
+        pushBatchId,
+        protocolVersion: 1,
+        actions: clean.actions
+      }
+    });
+    return res.status(out.status).json({ ok: out.ok, externalUserId: session.externalUserId, ...out.data });
+  } catch (e) {
+    console.error('[royale] spawn error', e);
+    return res.status(502).json({ ok: false, error: 'upstream_unavailable', reason: 'No se pudo contactar Asure Royale' });
+  }
 });
 
 app.get('/buy', (_req, res) => {

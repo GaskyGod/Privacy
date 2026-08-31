@@ -37,6 +37,8 @@ Comunes:
 - `FIREBASE_SERVICE_ACCOUNT_JSON` (JSON completo de service account; tambien acepta base64)
 - `APP_DOWNLOAD_URL` (link publico del instalador para mostrar tras compra web)
 - `WEB_BUY_ALLOWED_ORIGINS` (opcional; dominios permitidos para frontend externo, separado por comas. Ej: `https://tikplays.live,https://www.tikplays.live`. Usa `*` para permitir todos)
+- `ASURE_ROYALE_KEY` (clave `rylp_...` de Asure Royale; solo debe vivir en Railway)
+- `LDPLAYER_INSTALLER_URL` (URL vigente del instalador de LDPlayer que abrira la app local)
 
 Correo de confirmacion (opcional, no bloquea compra):
 
