@@ -23,6 +23,20 @@ function initFirebase() {
 initFirebase();
 const db = admin.firestore();
 
+// lastSeen se escribe SIN await y con throttle: con la quota de Firestore agotada,
+// un `await update()` queda pendiente (el SDK reintenta) y colgaba /license/validate
+// para todos. Ademas, escribir en cada peticion Royale (5 endpoints x cada regalo)
+// era lo que quemaba las ~20k escrituras/dia del plan gratis.
+const LAST_SEEN_MIN_INTERVAL_MS = 10 * 60 * 1000;
+const lastSeenWrites = new Map(); // licenseKey -> ms de la ultima escritura
+function touchLastSeen(ref, licenseKey) {
+  const now = Date.now();
+  if (now - (lastSeenWrites.get(licenseKey) || 0) < LAST_SEEN_MIN_INTERVAL_MS) return;
+  lastSeenWrites.set(licenseKey, now);
+  ref.update({ lastSeen: admin.firestore.FieldValue.serverTimestamp() })
+    .catch(() => { lastSeenWrites.delete(licenseKey); });
+}
+
 const app = express();
 app.use(express.json({
   limit: '2mb',
@@ -296,7 +310,7 @@ async function validateRoyaleLicense(req, res) {
       res.status(403).json({ ok: false, code: 'DEVICE_MISMATCH', reason: 'Licencia no corresponde a este dispositivo' });
       return null;
     }
-    await snap.ref.update({ lastSeen: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    touchLastSeen(snap.ref, licenseKey);
     return { licenseKey, deviceId, externalUserId: royaleExternalUserId(licenseKey, deviceId) };
   } catch (e) {
     console.error('[royale] license validation error', e);
@@ -736,7 +750,7 @@ app.post('/license/validate', licenseRateLimit({ windowMs: 60_000, max: 30 }), a
       auditLicenseEvent(req, 'LICENSE_VALIDATE_FAILED', { result: 'DEVICE_MISMATCH', key, deviceId, reason: 'Licencia ya reclamada por otra PC' });
       return res.json({ ok: false, code: 'DEVICE_MISMATCH', reason: 'Licencia ya reclamada por otra PC' });
     }
-    await snap.ref.update({ lastSeen: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    touchLastSeen(snap.ref, key);
     auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'MATCH', key, deviceId });
     return res.json({ ok: true, status: 'MATCH', expiresAtMs: state.expiresAtMs, daysRemaining: state.daysRemaining, hoursRemaining: state.hoursRemaining, isExpired: false });
   } catch (e) {
@@ -757,8 +771,22 @@ app.post('/license/claim', licenseRateLimit({ windowMs: 60_000, max: 12 }), asyn
   const key = keyCheck.value;
   const deviceId = devCheck.value;
   try {
+    // Camino comun (relanzar la app en la misma PC): solo lectura + lastSeen
+    // diferido. La transaccion con escritura queda solo para el claim real.
+    const ref = db.collection('licenses').doc(key);
+    const pre = await ref.get();
+    if (!pre.exists) throw new Error('NO_LICENSE');
+    const preData = pre.data() || {};
+    if (preData.active !== true) throw new Error('INACTIVE');
+    if (licenseTimeState(preData).isExpired) throw new Error('EXPIRED');
+    if (preData.deviceId && String(preData.deviceId) !== deviceId) throw new Error('ALREADY_CLAIMED');
+    if (preData.deviceId) {
+      touchLastSeen(ref, key);
+      auditLicenseEvent(req, 'LICENSE_CLAIM', { result: 'SUCCESS', key, deviceId });
+      return res.json({ ok: true });
+    }
+
     await db.runTransaction(async (tx) => {
-      const ref = db.collection('licenses').doc(key);
       const snap = await tx.get(ref);
       if (!snap.exists) throw new Error('NO_LICENSE');
       const data = snap.data() || {};
@@ -773,8 +801,6 @@ app.post('/license/claim', licenseRateLimit({ windowMs: 60_000, max: 12 }), asyn
           claimedAt: admin.firestore.FieldValue.serverTimestamp(),
           lastSeen: admin.firestore.FieldValue.serverTimestamp()
         });
-      } else {
-        tx.update(ref, { lastSeen: admin.firestore.FieldValue.serverTimestamp() });
       }
     });
     auditLicenseEvent(req, 'LICENSE_CLAIM', { result: 'SUCCESS', key, deviceId });
@@ -840,14 +866,10 @@ app.post('/license/heartbeat', licenseRateLimit({ windowMs: 60_000, max: 120 }),
     auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'REJECTED', key: req.body?.key, reason: keyCheck.reason });
     return res.status(400).json({ ok: false, reason: keyCheck.reason });
   }
-  try {
-    await db.collection('licenses').doc(keyCheck.value).update({ lastSeen: admin.firestore.FieldValue.serverTimestamp() });
-    auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'HEARTBEAT', key: keyCheck.value });
-    return res.json({ ok: true });
-  } catch {
-    auditLicenseEvent(req, 'LICENSE_REJECTED', { result: 'HEARTBEAT_FAILED', key: keyCheck.value, reason: 'Error servidor' });
-    return res.status(500).json({ ok: false, reason: 'Error servidor' });
-  }
+  // Telemetria pura: responder ya y escribir con throttle en segundo plano.
+  touchLastSeen(db.collection('licenses').doc(keyCheck.value), keyCheck.value);
+  auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'HEARTBEAT', key: keyCheck.value });
+  return res.json({ ok: true });
 });
 
 app.post('/license/live-connection', licenseRateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
@@ -859,7 +881,8 @@ app.post('/license/live-connection', licenseRateLimit({ windowMs: 60_000, max: 6
     return res.status(400).json({ ok: false, reason });
   }
   try {
-    await db.collection('licenses').doc(keyCheck.value).collection('liveConnections').add({
+    // Sin await: es un registro informativo y no debe colgar la conexion del live.
+    db.collection('licenses').doc(keyCheck.value).collection('liveConnections').add({
       licenseKey: keyCheck.value,
       deviceId: auditSafe(req.body?.deviceId),
       liveUsername: liveUsername.value,
@@ -870,7 +893,7 @@ app.post('/license/live-connection', licenseRateLimit({ windowMs: 60_000, max: 6
       userAgent: auditSafe(req.body?.userAgent || req.headers?.['user-agent'], 260),
       connectedAt: admin.firestore.FieldValue.serverTimestamp(),
       connectedAtMs: Date.now()
-    });
+    }).catch(() => {});
     auditLicenseEvent(req, 'LICENSE_VALIDATE_SUCCESS', { result: 'LIVE_CONNECTION', key: keyCheck.value, deviceId: req.body?.deviceId });
     return res.json({ ok: true });
   } catch {
